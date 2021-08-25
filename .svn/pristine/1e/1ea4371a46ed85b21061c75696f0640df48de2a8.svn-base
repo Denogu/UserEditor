@@ -1,0 +1,13 @@
+<cfcomponent extends="iwrs_controller">
+
+  <cffunction name="is_authorized" access="Public">
+    <cfreturn createObject('component', 'utilities.session_utilities').is_session_current()>
+  </cffunction>
+
+
+  <cffunction name="fit_results" access="Public">
+    <cfset local.view_data.fit_results = createObject("component", "models.item").all() />
+    <cfreturn render(view_data=local.view_data)>
+  </cffunction>
+
+</cfcomponent>

@@ -1,0 +1,20 @@
+<cfset participant = view_data.participant>
+<cfoutput>
+  <cfdocument format="pdf" margintop="1" marginbottom="1">
+    <cfdocumentitem type="header">
+      <h2 style="text-align: center;">#application.study# Randomization Certificate<h2>
+    </cfdocumentitem>
+
+    <div style="text-align: center; border: solid 1px ##000;">
+      <table>
+        <tbody>
+          <tr><td style="font-weight: bold; text-align: right;">Participant Name:</td><td style="text-align: left;">#participant.last_name#, #participant.first_name# #participant.middle_name#</td></tr>
+          <tr><td style="font-weight: bold; text-align: right;">Participant ID Number:</td><td style="text-align: left;">#participant.subject_number#</td></tr>
+          <tr><td style="font-weight: bold; text-align: right;">Check Code:</td><td style="text-align: left;">#participant.check_code#</td></tr>
+          <tr><td style="font-weight: bold; text-align: right;">Randomized By:</td><td style="text-align: left;">#participant.randomized_by#</td></tr>
+          <tr><td style="font-weight: bold; text-align: right;">Randomized On:</td><td style="text-align: left;">#dateformat(participant.randomized_at, "short")#</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </cfdocument>
+</cfoutput>

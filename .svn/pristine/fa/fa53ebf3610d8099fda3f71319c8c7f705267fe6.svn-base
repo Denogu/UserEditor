@@ -1,0 +1,28 @@
+<cfcomponent output="false">
+
+  <cfset variables.table_name = 'pa_participants'>
+
+<!---********************************* Public Methods ********************************************--->
+
+<!--- Get all of the item records for a specified participant. --->
+  <cffunction name="find_by_subject_number" access="public" returntype="Query">
+    <cfargument name="subject_number" type="numeric" required="true">
+
+    <cfquery name="local.rec" datasource="#application.dsn#" maxrows="1">
+      SELECT top 1 *
+      FROM #variables.table_name#
+      WHERE partID = <cfqueryparam value="#arguments.subject_number#" cfsqltype="CF_SQL_INTEGER">
+    </cfquery>
+
+		<cfif local.rec.recordCount is 0>
+			<cfthrow message="No PA participant record found." type="PaParticipant.MissingRecord">
+    <cfelseif local.rec.recordCount gt 1>
+      <cfthrow message="More than one PA participant record was found!" type="PaParticipant.DuplicateRecords">
+		</cfif>
+
+    <cfreturn local.rec>
+  </cffunction>
+
+<!---******************************** Private Methods **************************************--->
+
+</cfcomponent>

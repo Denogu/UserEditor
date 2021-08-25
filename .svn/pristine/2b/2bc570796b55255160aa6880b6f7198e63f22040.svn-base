@@ -1,0 +1,453 @@
+<cfcomponent output="false">
+	<!--- Database Meta Data (DBMD) --->
+	<cfset variables.table_name = 'pii.iwrs_participants'>
+	<cfset variables.field_names = ['id',
+                                  'site_number',
+                                  'obs_num', 
+								                  'treatment_arm_id',
+								                  'treatment_description',
+								                  'is_available', 
+								                  'is_active', 
+								                  'is_unblinded', 
+                                  'subject_number',
+                                  'check_code',
+                                  'first_name',
+                                  'middle_name',
+                                  'last_name',
+                                  'ssn',
+                                  'client_timezone_offset', 
+                                  'randomized_at', 
+                                  'randomized_at_utc', 
+                                  'randomized_by',
+                                  'user_name', 
+                                  'created_at',
+                                  'updated_at']>
+	
+
+
+
+	<!--- Finds the record in the database by the record's id.  Builds an object with member variables defined from the table's
+	      field names and values. --->
+	<cffunction name="init" output="false" access="Public">
+		<cfargument name="id" required="true" type="numeric">
+		
+		<cfset this.id = arguments.id>
+		<cfset build_orm_object(arguments.id)>
+		
+		<cfreturn this>
+	</cffunction>
+
+
+
+	<!--- Finds the record in the database by the record's ssn.  Builds an object with member variables defined from the table's
+	      field names and values. --->
+	<cffunction name="init_by_ssn" output="false" access="Public">
+		<cfargument name="ssn" required="true" type="String">
+		
+    <cftry>
+		  <cfset build_orm_object_by_ssn(arguments.ssn)>
+    <cfcatch type="Participant.FindRecordBySSN">
+      <cfthrow message="#cfcatch.message#" type="Participant.InitBySSN.MissingRecord">
+    </cfcatch>
+    </cftry>
+		
+		<cfreturn this>
+	</cffunction>
+
+
+
+  <!--- Find the participant record using the participant number and check code.  If no record is found, return 'Participant not found' error. --->
+  <cffunction name="find_participant_by_subject_number_and_check_code" access="public">
+    <cfargument name="subject_number" type="string" required="true">
+    <cfargument name="check_code" type="string" required="true">
+    <cfargument name="site_number" type="string" required="true">
+
+    <cfquery name="local.id_from_subject_number_and_check_code" datasource="#application.dsn#">
+      SELECT id 
+      FROM #variables.table_name# 
+      WHERE subject_number =  <cfqueryparam value="#arguments.subject_number#" cfsqltype="cf_sql_varchar" maxlength="12"> 
+        and check_code = <cfqueryparam value="#arguments.check_code#" cfsqltype="cf_sql_varchar" maxlength="4">
+        and site_number = <cfqueryparam value="#arguments.site_number#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+
+    <cfif local.id_from_subject_number_and_check_code.RecordCount EQ 0>
+      <cfthrow type="IWRS.Participant.MissingRecord" message="Randomization record not found.  Please make sure that you entered the subject number and check code correctly.">
+    </cfif>
+    
+    <cfif local.id_from_subject_number_and_check_code.RecordCount GT 1>
+      <cfthrow type="IWRS.Participant.MultipleRandomizations" message="Multiple randomization records found for participant.  Please Call the Albuquerque Pharmacy Coordinating Center.">
+    </cfif>
+    
+    <cfreturn createObject("component", "models.participant").init(local.id_from_subject_number_and_check_code.id)>
+  </cffunction>
+
+       
+  
+  <cffunction name="all_for_site" access="public" returntype="Query">
+    <cfquery name="local.participants_at_site" datasource="#application.dsn#">
+      SELECT * FROM #variables.table_name# 
+      WHERE site_number = <cfqueryparam value="#session.user.site_number#" cfsqltype="CF_SQL_INTEGER">
+      and randomized_at is not null
+      order by ID DESC
+    </cfquery>
+    <cfreturn local.participants_at_site>
+  </cffunction>
+
+
+
+<!--- Associates a participant with a randomization record --->
+  <cffunction name="randomize" output="false" access="public" >
+    <cfargument name="form_fields" type="Struct" required="true"> 
+    <cfset local.eligibility_results = check_randomization_eligibility(arguments.form_fields)> 
+    
+    <cflock scope="session" timeout="5" type="exclusive">
+      <cfif not local.eligibility_results.eligible>
+        <cfthrow message="#ArraytoList(local.eligibility_results.validation_errors)#" type="IWRS.ParticipantIneligible">
+      </cfif>
+
+      <!--- Make sure this is not a duplicate randomization request --->
+      <cfset local.duplicate_recs = find_by('form_number', arguments.form_fields.form_number)>
+      <cfif local.duplicate_recs.recordCount EQ 1><!--- Duplicate request, previous request succeeded-give user participant record id. --->
+        <cfreturn local.duplicate_recs.id[1]>
+      <cfelseif local.duplicate_recs.recordCount GT 1><!--- This should never happen but better check. --->
+        <cfthrow message="There are multiple randomizations associated with this request. Please contact Albuquerque Pharmacy Coordinating Center." type="IWRS.DuplicateFormSubmissions">
+      </cfif>
+
+      <cftransaction>
+        <cfset local.participant_rec = get_next_available_participant_record_for_site()>
+    
+        <cfif local.participant_rec.RecordCount is 0>
+          <cfthrow message="There are no available records in the randomization schema to randomize the participant." type="IWRS.NoAvailableParticipantRecords">
+        </cfif>
+          
+        <cfset local.participant_id = local.participant_rec.id>
+
+        <cfquery name="update_next_available_randomization_record" datasource="#application.dsn#">
+          UPDATE #variables.table_name#
+          SET is_available = 0,
+              is_active = 1,
+              subject_number = <cfqueryparam value="#arguments.form_fields.subject_number#" cfsqltype="cf_sql_integer" null="no">,
+              check_code = <cfqueryparam value="#arguments.form_fields.check_code#" cfsqltype="cf_sql_varchar" maxlength="50" null="no">,
+              first_name = <cfqueryparam value="#arguments.form_fields.first_name#" cfsqltype="cf_sql_varchar" maxlength="50" null="no">,
+              middle_name = <cfqueryparam value="#arguments.form_fields.middle_name#" cfsqltype="cf_sql_varchar" maxlength="50" null="no">,
+              last_name = <cfqueryparam value="#arguments.form_fields.last_name#" cfsqltype="cf_sql_varchar" maxlength="50" null="no">,
+              ssn = <cfqueryparam value="#arguments.form_fields.ssn#" cfsqltype="cf_sql_varchar" maxlength="11" null="no">,
+              form_number = <cfqueryparam value="#arguments.form_fields.form_number#" cfsqltype="cf_sql_varchar" maxlength="50" null="no">,
+              client_timezone_offset = <cfqueryparam value="#arguments.form_fields.utc_offset#" cfsqltype="cf_sql_integer" null="no">,
+              randomized_at = GETDATE(),
+              randomized_at_utc = GETUTCDATE(),
+              randomized_by = <cfqueryparam value="#session.user.name#" cfsqltype="cf_sql_varchar" maxlength="50">,
+              updated_at = GETDATE(),
+              user_name = <cfqueryparam value="#session.user.name#" cfsqltype="cf_sql_varchar" maxlength="50">
+          WHERE id = <cfqueryparam value="#local.participant_id#" cfsqltype="cf_sql_integer">
+        </cfquery>	
+      </cftransaction>
+    </cflock> 
+    
+    <cfreturn local.participant_id>
+  </cffunction>
+
+
+
+  <cffunction name="check_randomization_eligibility" access="public" returntype="Struct">
+    <cfargument name="form_fields" type="struct" required="true">
+    <cfset local.eligibility_results = StructNew()>
+    <cfset local.eligibility_results.eligible = false>
+    <cfset local.eligibility_results.validation_errors = get_randomization_form_validation_errors(arguments.form_fields)>
+    
+    <cftry><!--- Needs to be wrapped in cftry for case when subject number is for a different site. --->
+      <cfinvoke component="models.check_code" method="confirm_eligibility" returnvariable="local.is_eligible">
+        <cfinvokeargument name="subject_number" value="#arguments.form_fields.subject_number#">
+        <cfinvokeargument name="check_code" value="#arguments.form_fields.check_code#">
+      </cfinvoke>
+      <cfif not local.is_eligible>
+        <cfset ArrayAppend(local.eligibility_results.validation_errors, "Subject number and check code do not match.")>
+      </cfif>
+    <cfcatch type="IWRS">
+      <cfset ArrayAppend(local.eligibility_results.validation_errors, cfcatch.message)>
+    </cfcatch>
+    </cftry>      
+    
+    <cfif find_by('subject_number', arguments.form_fields.subject_number).recordCount NEQ 0>
+      <cfset ArrayAppend(local.eligibility_results.validation_errors, "Subject number already randomized.")>
+    </cfif>
+
+    <cfif find_by('ssn', arguments.form_fields.ssn).recordCount NEQ 0>
+      <cfset ArrayAppend(local.eligibility_results.validation_errors, "Social security number already randomized.")>
+    </cfif>
+    
+    <cfif ArrayIsEmpty(local.eligibility_results.validation_errors)>
+      <cfset local.eligibility_results.eligible = true>
+    </cfif>
+
+    <cfreturn local.eligibility_results>
+  </cffunction>
+
+
+
+<!--- Get all of the participant's items --->
+  <cffunction name="items" access="public" returntype="Query">
+    <cfreturn createObject("models.item").all_for_participant(this.id)>
+  </cffunction>
+
+
+
+<!--- Get all of the participant's orders --->
+  <cffunction name="orders" access="public" returntype="Query">
+    <cfreturn createObject("models.order").all_for_participant(this.id)>
+  </cffunction>  
+
+
+
+<!--- Get the order object for the participant's last verified order. --->
+  <cffunction name="last_verified_order" access="public">
+    <cfreturn createObject("models.order").participants_last_verified_order(this.id)>
+  </cffunction> 
+
+
+
+<!--- Update the participant status. Record Status change. --->
+  <cffunction name="update_status" access="public" returntype="Void">
+    <cfargument name="is_active" type="string" required="true">
+    <cfargument name="reason" type="string" required="true">
+
+    <cfif this.is_participant_unblinded()>
+      <cfthrow message="you cannot change the participant's status because the participant has been unblinded." type="Participant.UpdateStatus.Unblinded">
+    </cfif>
+
+    <cfif Trim(arguments.reason) EQ ''>
+      <cfthrow message="You must provide a reason for changing the participant's status." type="Participant.UpdateStatus.MissingReason">
+    </cfif>
+
+    <cfif not arguments.is_active EQ '1' and not arguments.is_active EQ '0'>
+      <cfthrow message="Unknown status." type="Participant.UpdateStatus.UnknownStatus">
+    </cfif>
+
+    <cfif arguments.is_active EQ this.is_active>
+      <cfthrow message="The new status is the same as the participant's current status." type="Participant.UpdateStatus.SameStatus">
+    </cfif>
+    
+    <cftransaction>
+      <cfset update_participant_status(arguments.is_active)>
+      <cfset local.new_note = add_note("Changed is_active from #this.is_active# to #arguments.is_active#: #arguments.reason#")>
+      <cfset this.is_active = arguments.is_active>
+    </cftransaction>
+  </cffunction>
+
+
+
+<!--- Has the participant been unblinded --->
+  <cffunction name="is_participant_unblinded" access="public" returntype="Boolean">
+    <cfif this.is_unblinded EQ 1>
+      <cfreturn true>
+    </cfif>
+    <cfreturn false>
+  </cffunction>
+
+
+
+<!--- Update the is_unblinded flag to 1. --->
+  <cffunction name="unblind" access="public" returntype="Void">
+    <cfif this.is_participant_unblinded()>
+      <cfthrow message="The participant has already been unblinded." type="Participant.Unblind.AlreadyUnblinded">
+    </cfif>
+
+
+    <cftransaction>
+      <cfquery datasource="#application.dsn#">
+        UPDATE #variables.table_name#
+        SET is_unblinded = <cfqueryparam value="1" cfsqltype="CF_SQL_BIT">,
+          is_active = <cfqueryparam value="0" cfsqltype="CF_SQL_BIT">,
+          updated_at = GETDATE(),
+          [user_name] = <cfqueryparam value="#session.user.name#" cfsqltype="CF_SQL_VARCHAR">        
+        WHERE id = <cfqueryparam value="#this.id#" cfsqltype="cf_sql_integer">
+      </cfquery>
+
+      <cfset add_note("Unblinded: The participant was unblinded.")>
+    </cftransaction>
+
+    <cfset this.is_unblinded = 1>
+    <cfset this.is_active = 0>
+  </cffunction>
+
+
+
+<!--- Get the pa_participant object for the participant. --->
+  <cffunction name="pa_participant" access="public">
+    <cfreturn createObject("models.pa_participant").find_by_subject_number(this.subject_number)>
+  </cffunction>
+
+<!--- PRIVATE METHODS --->
+
+
+  <cffunction name="add_note" access="private">
+    <cfargument name="note" type="string" required="true">
+
+    <cfreturn createObject("models.participant_note").create({note = arguments.note, user_name = session.user.name})> 
+  </cffunction>
+
+
+
+  <cffunction name="update_participant_status" access="private" output="false" returnType="Void">
+    <cfargument name="is_active" type="string" required="true">
+    <cfquery datasource="#application.dsn#">
+      UPDATE #variables.table_name#
+      SET is_active = <cfqueryparam value="#arguments.is_active#" cfsqltype="CF_SQL_BIT">,
+        updated_at = GETDATE(),
+        [user_name] = <cfqueryparam value="#session.user.name#" cfsqltype="CF_SQL_VARCHAR">        
+      WHERE id = <cfqueryparam value="#this.id#" cfsqltype="cf_sql_integer">
+    </cfquery>
+  </cffunction>
+
+
+  
+  <cffunction name="get_next_available_participant_record_for_site" access="private" output="false" returnType="Query">
+    <cfquery name="local.next_available_randomization_record" datasource="#application.dsn#" maxrows="1">
+      SELECT TOP 1 ID 
+      FROM #variables.table_name#
+      WHERE site_number = <cfqueryparam value="#session.user.site_number#" cfsqltype="cf_sql_integer">
+        and subject_number is null
+        and is_available = 1 
+      ORDER by id
+    </cfquery>
+
+    <cfreturn local.next_available_randomization_record>
+  </cffunction>
+
+
+  <cffunction name="find_by" access="private" output="false" returntype="query">
+    <cfargument name="field_name" type="string" required="true">
+    <cfargument name="field_value" type="string" required="true">
+    
+    <cfquery name="local.recs" datasource="#application.dsn#">
+      SELECT *
+      FROM #variables.table_name#
+      WHERE #field_name# = <cfqueryparam value="#arguments.field_value#">
+    </cfquery>
+
+    <cfreturn local.recs>
+  </cffunction>
+
+
+
+  <cffunction name="get_randomization_form_validation_errors" output="false" access="private" returntype="Array">
+    <cfargument name="form_fields" type="Struct" required="true">
+    <cfset local.validation_errors = ArrayNew(1)>
+
+    <cfif REFIND("^#session.user.site_number#[0-9]{4}$", arguments.form_fields.subject_number) EQ 0>
+      <cfset ArrayAppend(validation_errors,"Subject number must be your 3-digit site number followed by 4 digits.")>
+    </cfif>
+    <cfif REFIND("^[a-zA-Z]{4}$", arguments.form_fields.check_code) EQ 0>
+      <cfset ArrayAppend(validation_errors,"Check code must be your 4 characters.")>
+    </cfif>
+    <cfif arguments.form_fields.first_name EQ "">
+      <cfset ArrayAppend(validation_errors,"First name cannot be blank.")>
+    </cfif>
+    <cfif REFIND("^[a-zA-Z]{2,50}$",arguments.form_fields.first_name) EQ 0>
+      <cfset ArrayAppend(validation_errors,"First name must be between 2 and 50 characters and can only contain letters.")>
+    </cfif>
+    <cfif arguments.form_fields.middle_name EQ "">
+      <cfset ArrayAppend(validation_errors,"Middle name cannot be blank.")>
+    </cfif>
+    <cfif REFIND("^[a-zA-Z]{1,50}$",arguments.form_fields.middle_name) EQ 0>
+      <cfset ArrayAppend(validation_errors,"Middle name must be between 1 and 50 characters and can only contain letters.")>
+    </cfif>
+    <cfif arguments.form_fields.last_name EQ "">
+      <cfset ArrayAppend(validation_errors,"Last name cannot be blank.")>
+    </cfif>
+    <cfif REFIND("^[a-zA-Z]{1,25}[- ']{0,1}[a-zA-Z]{1,24}$",arguments.form_fields.last_name) EQ 0>
+      <cfset ArrayAppend(validation_errors,"Last name must be between 2 and 50 characters and can only contain letters.")>
+    </cfif>
+    <cfif REFIND("^[0-9]{3}-[0-9]{2}-[0-9]{4}$", arguments.form_fields.ssn) EQ 0>
+      <cfset ArrayAppend(validation_errors,"Social security number must be ######-####-########.")>
+    </cfif>
+    <cfif arguments.form_fields.ssn NEQ arguments.form_fields.ssn_verification>
+      <cfset ArrayAppend(validation_errors,"You must confirm the social security number.")>
+    </cfif>
+    <cfif ucase(arguments.form_fields.is_icf_on_file) NEQ 'YES'>
+      <cfset ArrayAppend(validation_errors,"A signed informed consent form must be on file.")>
+    </cfif>
+    <cfif ucase(arguments.form_fields.icf_with_pharmacist) NEQ 'YES'>
+      <cfset ArrayAppend(validation_errors,"A copy of the signed consent form must be given to the research pharmacist.")>
+    </cfif>
+    
+    <cfreturn local.validation_errors>
+  </cffunction>
+
+
+
+	<!--- Get the record, define member variables from record field names and values.--->
+	<cffunction name="build_orm_object" output="false" access="private" returntype="void">
+		<cfargument name="record_id" required="true" type="numeric">
+		<cfset local.rec = find_record_by_id(arguments.record_id)>
+		
+		<cfloop array=#variables.field_names# index="field_name">
+			<cfset this[#field_name#]= local.rec[#field_name#]>
+		</cfloop>
+	</cffunction>
+	
+
+
+	<!--- Look for a record with the specified id, throw an error if it is not found. --->
+	<cffunction name="find_record_by_id" output="false" access="private" returntype="Query">
+		<cfargument name="record_id" required="true" type="numeric">
+		
+		<cfquery name="local.record" datasource="#application.dsn#" maxrows="1">
+			SELECT * FROM #variables.table_name#
+				WHERE id = <cfqueryparam value="#arguments.record_id#" cfsqltype="cf_sql_integer" null="false">
+		</cfquery>
+		
+		<cfif local.record.recordCount is 0>
+			<cfthrow type="custom" message="No record found.">
+		</cfif>
+		
+		<cfreturn local.record>
+	</cffunction>
+
+
+	<!--- Get the record, define member variables from record field names and values.--->
+	<cffunction name="build_orm_object_by_ssn" output="false" access="private" returntype="void">
+		<cfargument name="record_ssn" required="true" type="string">
+		<cfset local.rec = find_record_by_ssn(arguments.record_ssn)>
+		
+		<cfloop array=#variables.field_names# index="field_name">
+			<cfset this[#field_name#]= local.rec[#field_name#]>
+		</cfloop>
+	</cffunction>
+	
+
+
+	<!--- Look for a record with the specified ssn, throw an error if it is not found. --->
+	<cffunction name="find_record_by_ssn" output="false" access="private" returntype="Query">
+		<cfargument name="record_ssn" required="true" type="string">
+		
+		<cfquery name="local.record" datasource="#application.dsn#" maxrows="1">
+			SELECT * FROM #variables.table_name#
+				WHERE ssn = <cfqueryparam value="#arguments.record_ssn#" cfsqltype="cf_sql_varchar" null="false">
+		</cfquery>
+		
+		<cfif local.record.recordCount is 0>
+			<cfthrow type="Participant.FindRecordBySSN" message="No randomization record found for the provided ssn.">
+		</cfif>
+		
+		<cfreturn local.record>
+	</cffunction>
+
+
+
+
+  <cffunction name="isValidDateFormat" access="public" output="false" returntype="boolean">
+   <cfargument name="test_date" type="string" required="true">
+   <cfset local.is_valid_format = false />
+   <cfif Refind('^(0[1-9]|1[012])([-/.])(0[1-9]|[12][0-9]|3[01])\2(19|20)\d\d$', test_date) NEQ 0> <!--- mm/dd/yyyy mm-dd-yyyy mm.dd.yyyy --->
+     	<cfset local.is_valid_format = true />
+    <cfelseif Refind('^(0[1-9]|[12][0-9]|3[01])([-/.])(0[1-9]|1[012])\2(19|20)\d\d$', test_date) NEQ 0>  <!--- dd/mm/yyyy dd-mm-yyyy dd.mm.yyyy --->   
+   		<cfset local.is_valid_format = true />
+    <cfelseif Refind('^(19|20)\d\d([-/.])(0[1-9]|1[012])\2(0[1-9]|[12][0-9]|3[01])$', test_date) NEQ 0>  <!--- yyyy/mm/dd yyyy-mm-dd yyyy.mm.dd --->   
+    	<cfset local.is_valid_format = true />   
+    </cfif>
+    <cfreturn local.is_valid_format/>
+ </cffunction>
+
+
+</cfcomponent>

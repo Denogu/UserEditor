@@ -1,0 +1,15 @@
+//$(document).ready is where you add event handlers to elements.
+$(document).ready(function() {
+	
+  var unblinded_participants_table = $('#unblinded_participants_table').DataTable({	
+    "columnDefs": [ 
+      {
+        "targets": [0],
+        "searchable": false
+      }
+    ],
+    "order": [[4, 'desc']],
+	  "lengthMenu": [[10, 25, 50, -1],[10, 25, 50, "All"]] ,  
+		"pageLength": 25
+	});			
+});

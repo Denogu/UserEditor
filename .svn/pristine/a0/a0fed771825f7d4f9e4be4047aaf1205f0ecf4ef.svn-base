@@ -1,0 +1,82 @@
+<cfcomponent extends="iwrs_controller">
+
+  <cffunction name="is_authorized" access="Public">
+    <cfreturn model("role").init(session.user.role_id).is_site_team()
+      OR session.user.is_crpcc>
+  </cffunction>
+
+
+  
+  <!--- Get all of the participants at the user's site and pass to the index template. --->
+  <cffunction name="index" access="Public">
+    <cfset local.view_data.participants = createObject("models.participant").all_for_site()>
+    <cfreturn render(view_data=local.view_data)>
+  </cffunction>
+
+
+
+  <cffunction name="check_randomization_eligibility" access="Public">
+    <cfset local.view_data.eligibility_results = createObject("models.participant").check_randomization_eligibility(this.params)>
+    <cfreturn render_json(view_data=local.view_data)>
+  </cffunction>
+
+
+
+  <cffunction name="new" access="Public">
+    <cfreturn render()>
+  </cffunction>
+
+
+  <cffunction name="details" access="Public">
+    <cfset this.view_data.participant = createObject("models.participant").init(this.params.id)>
+    <cfreturn render(view_data=this.view_data)>
+  </cffunction>
+
+
+  <cffunction name="randomize" access="Public">
+    <cftry>
+      <cfset local.participant_id = createObject("models.participant").randomize(this.params)>
+      <cfset this.view_data.is_success = 1>
+      <cfset local.certificate_link = '<br/>Click here for the <a class="btn btn-success" href="./randomization_certificate/#local.participant_id#">Randomization Certificate</a>.'>
+      <cfset this.view_data.message = application.randomization_success_message & local.certificate_link>
+    <cfcatch type="IWRS">
+      <cfset this.view_data.is_success = 0>
+      <cfset this.view_data.message = cfcatch.message>
+    </cfcatch>
+    </cftry>
+    <cfreturn render_json(view_data=this.view_data)>
+  </cffunction>
+
+
+
+  <cffunction name="randomization_certificate" access="Public">
+    <cfset this.view_data.participant = createObject("models.participant").init(this.params.id)>
+    <cfreturn render(view_data=this.view_data)>
+  </cffunction>
+
+  
+  
+  <cffunction name="change_status_form" access="Public">
+    <cfset this.view_data.participant = createObject("models.participant").init(this.params.id)>
+    <cfreturn render_partial(view_data=this.view_data)>
+  </cffunction>
+
+
+
+  <cffunction name="change_status" access="Public">
+    <cfset this.view_data.contains_error = false>
+    <cftry>
+      <cfset this.view_data.participant = createObject("models.participant").init(this.params.id)>
+      <cfset this.view_data.participant.update_status(this.params.is_active, this.params.reason)>
+      <cfset this.view_data.response = "You have successfully updated the participant's status."> 
+    <cfcatch>
+      <cfset this.view_data.contains_error = true>
+      <cfset this.view_data.response = cfcatch.message>
+    </cfcatch>
+    </cftry>
+
+    <cfreturn render_partial(view_data=this.view_data)>
+  </cffunction>
+
+
+</cfcomponent>

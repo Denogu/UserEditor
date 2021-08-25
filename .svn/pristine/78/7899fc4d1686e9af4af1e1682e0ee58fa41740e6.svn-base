@@ -1,0 +1,10 @@
+//$(document).ready is where you add event handlers to elements.
+$(document).ready(function() {
+	
+  $('#order_medication_table').DataTable({	
+    "order": [[0, 'desc']],
+	  "lengthMenu": [[10, 25, 50, -1],[10, 25, 50, "All"]] ,  
+		"pageLength": 25
+	});			
+
+});

@@ -1,0 +1,38 @@
+<cfset current_status = view_data.participant.is_active>
+
+<cfif current_status NEQ 0>
+  <cfset new_status = 0>
+  <cfset status_message = "The participant is not taking study medication">
+<cfelse>
+  <cfset new_status = 1>
+  <cfset status_message = "The participant is taking study medication">
+</cfif>
+
+<cfoutput>
+<div class="modal-content">
+  <div class="modal-header"> 
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    <h3 class="modal-title">Change Participant Status</h3>
+    <p>NOTE: Changing the participant's status in the IWRS determines whether or not the Pharmacy Coordinating Center can fill presciptions for the participant. If you indicate the participant is not
+    taking study medication, the Pharmacy Coordinating Center will not be able to fill prescriptions for the participant.</p>
+  </div>
+  <div id="modal_change_participant_status_form_body" class="modal-body">
+    <form name="change_participant_status_form" id="change_participant_status_form" action="#application.url_root#/main.cfm/participants/change_status" class="container-fluid">
+      <input type="hidden" name="id" id="id" value="#view_data.participant.id#"> 
+      <input type="hidden" name="is_active" id="is_active" value="#new_status#"> 
+
+      <div class="form-group">
+        <label for="new_status">Participant's New Status</label>    
+        <input name="status" id="status" class="form-control" value="#status_message#" readonly/>
+      </div>
+      
+      <div class="form-group">
+        <label for="reason">Why are you changing the participant's status?</label>    
+        <textarea class="form-control" rows="5" name="reason" id="reason"></textarea>
+      </div>
+      <input type="submit" class="btn btn-primary" name="submit_put_on_hold_form_button" value="Change Participant Status"/>
+      <button type="button" class="btn btn-default" data-dismiss="modal">Close without changing the participant's status</button>
+    </form>   
+  </div>
+</div>
+</cfoutput>

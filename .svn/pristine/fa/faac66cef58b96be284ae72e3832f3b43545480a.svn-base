@@ -1,0 +1,29 @@
+<cfcomponent output="false" extends="core.model">
+
+	<cffunction name="table_name" access="public">
+		<cfreturn "iwrs_check_codes"> 
+	</cffunction>
+
+
+  <cffunction name="confirm_eligibility" access="public" output="false" returntype="boolean">
+    <cfargument name="subject_number" type="string" required="true">
+    <cfargument name="check_code" type="string" required="true">
+    
+    <cfif left(arguments.subject_number,3) NEQ session.user.site_number>
+      <cfthrow message="The subject number does not match a subject number for your site." type="IWRS.CheckCode.InvalidSubjectNumber">
+    </cfif>
+    <cfif REFIND("^#session.user.site_number#[0-9]{4}$", arguments.subject_number) EQ 0>
+      <cfthrow message="Subject number must be your 3-digit site number followed by 4 digits." type="IWRS.CheckCode.InvalidSubjectNumber">
+    </cfif> 
+    
+    <cfquery result="local.result" datasource="#application.dsn#" >
+      SELECT check_code 
+			FROM #table_name()#
+      WHERE subject_number = <cfqueryparam value="#arguments.subject_number#"> 
+        AND check_code = <cfqueryparam value="#arguments.check_code#">
+    </cfquery>
+
+    <cfreturn local.result.RecordCount IS 1>
+  </cffunction>
+
+</cfcomponent>	

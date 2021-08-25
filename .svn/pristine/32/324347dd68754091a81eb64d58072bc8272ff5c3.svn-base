@@ -1,0 +1,199 @@
+<cfcomponent output="false">
+	
+	<!--- Database Meta Data (DBMD) --->
+	<cfset variables.table_name = 'iwrs_user_password_history'>
+	<cfset variables.field_names = ['id',
+                                  'user_id', 
+                                  'password',
+                                  'salt', 
+                                  'created_at']>
+
+
+
+
+
+
+	<cffunction name="init" output="false" access="Public">
+    <cfargument name="id" required="true" type="numeric">
+		
+    <cfset var rec = find_record_by_id(arguments.id)>
+		<cfset this.id = arguments.id>
+		<cfset build_orm_object(rec)>
+
+		<cfreturn this>
+	
+  </cffunction>
+
+
+
+
+
+<!---
+  <cffunction name="find_count_by_user_id" output="false" access="Public">
+    <cfargument name="user_id" required="true">
+
+    <cfquery datasource="#application.dsn#" result="local.result">
+      SELECT *
+      FROM [#variables.table_name#]
+      WHERE user_id = <cfqueryparam value="#arguments.user_id#" cfsqltype="CF_SQL_VARCHAR">
+    </cfquery>    
+
+    <cfreturn local.result.RecordCount>
+  </cffunction>
+ ---> 
+
+
+
+
+<!---
+	<cffunction name="find_one_by_user_id" output="false" access="Public">
+    <cfargument name="user_id" required="true">
+
+    <cfset local.obj = createObject("component", "models.user_password_history").init(variables.password_utility)>
+
+    <cfquery datasource="#application.dsn#" name="local.records">
+      SELECT *
+      FROM [#variables.table_name#]
+      WHERE user_id = <cfqueryparam value="#arguments.user_id#" cfsqltype="CF_SQL_VARCHAR">
+    </cfquery>    
+
+		<cfloop array=#variables.field_names# index="field_name">
+			<cfset local.obj[#field_name#]= local.records[#field_name#]>
+		</cfloop>
+
+    <cfreturn local.obj>
+  </cffunction>
+--->
+
+
+
+
+
+  <!--- Save will only insert not update. --->
+	<cffunction name="create" output="false" access="Public" returntype="boolean">
+    <cfargument name="user_id" type="string" required="true">
+    <cfargument name="plain_text_password" type="string" required="true">
+    <cfargument name="salt" type="string" required="true">
+    <cfargument name="password_history_enforced_count" type="string" required="true">
+
+    <cfif is_password_unique_for_user(user_id=arguments.user_id, plain_text_password=arguments.plain_text_password, password_history_enforced_count=arguments.password_history_enforced_count) >
+      <cfreturn insert_record(
+                              user_id=arguments.user_id,
+                              plain_text_password=arguments.plain_text_password,
+                              salt=arguments.salt
+                              )/>
+    <cfelse>
+      <cfreturn false>
+    </cfif>
+	</cffunction>
+
+
+
+
+
+  <cffunction name="is_password_unique_for_user" output="false" access="private" returntype="boolean">
+    <cfargument name="user_id" required="true">
+    <cfargument name="plain_text_password" required="true">
+    <cfargument name="password_history_enforced_count" required="true">
+
+    <cfset local.is_password_unique = true>
+    
+    <cfquery datasource="#application.dsn#" name="local.records">
+        SELECT TOP (#arguments.password_history_enforced_count#) *
+        FROM [#variables.table_name#]
+        WHERE user_id = <cfqueryparam value="#arguments.user_id#" cfsqltype="cf_sql_integer" null="no">
+        ORDER BY created_at DESC 
+    </cfquery>
+
+	<cfset local.password_utility = createObject("component", "utilities.password") />
+    <cfloop query="local.records">
+      <cfset local.hashed_password = local.password_utility.secure(password=arguments.plain_text_password, salt=local.records.salt) />  
+      
+      <cfif local.hashed_password IS local.records.password>
+        <cfset local.is_password_unique = false>
+        <cfbreak>
+      </cfif> 
+    </cfloop>
+    
+    <cfreturn local.is_password_unique>
+	</cffunction>
+
+
+
+
+
+<!---
+	<cffunction name="delete" output="false" access="public">
+    <cfargument name="user_id" required="true">
+
+    <cfquery datasource="#application.dsn#" result="local.result">
+        DELETE 
+        FROM [#variables.table_name#]
+        WHERE user_id = <cfqueryparam value="#arguments.user_id#" cfsqltype="CF_SQL_VARCHAR">
+    </cfquery>
+		
+    <cfreturn local.result.RecordCount IS 1>
+	</cffunction>
+--->
+
+
+
+
+
+  <!--- Save will only insert not update. --->
+	<cffunction name="insert_record" output="false" access="private" returntype="boolean">
+    <cfargument name="user_id" required="true">
+    <cfargument name="plain_text_password" required="true">
+    <cfargument name="salt" required="true">
+
+    <cfset local.hashed_password = createObject("component", "utilities.password").secure(password=arguments.plain_text_password, salt=arguments.salt)>
+
+    <cfquery datasource="#application.dsn#" result="local.result">
+        INSERT INTO [#variables.table_name#] (user_id, password, salt)
+        VALUES(
+            <cfqueryparam value="#arguments.user_id#" cfsqltype="cf_sql_integer">,
+            <cfqueryparam value="#local.hashed_password#" cfsqltype="CF_SQL_VARCHAR">,
+            <cfqueryparam value="#arguments.salt#" cfsqltype="CF_SQL_VARCHAR">
+          )
+    </cfquery>
+		
+    <cfreturn local.result.RecordCount IS 1>
+	</cffunction>
+    
+
+
+
+
+
+     <!--- Get the record, define member variables from record field names and values.--->
+	<cffunction name="build_orm_object" output="false" access="private" returntype="void">
+		<cfargument name="rec" required="true" type="Query">
+
+		<cfloop array=#variables.field_names# index="field_name">
+			<cfset this[#field_name#]= rec[#field_name#]>
+		</cfloop>
+	</cffunction>
+    
+    
+	
+    
+    
+    
+	<!--- Look for a record with the specified id, throw an error if it is not found. --->
+	<cffunction name="find_record_by_id" output="false" access="private" returntype="Query">
+		<cfargument name="record_id" required="true" type="numeric">
+		
+		<cfquery name="record" datasource="#application.dsn#">
+			SELECT TOP 1 * FROM [#variables.table_name#]
+				WHERE id = <cfqueryparam value="#arguments.record_id#" cfsqltype="cf_sql_integer" null="false">
+		</cfquery>
+		
+		<cfif record.recordCount EQ 0>
+			<cfthrow type="custom" message="No record found.">
+		</cfif>
+		
+		<cfreturn record>
+	</cffunction>
+
+
+</cfcomponent>

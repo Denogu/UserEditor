@@ -1,0 +1,18 @@
+<cfcomponent extends="iwrs_controller">
+  <cffunction name="is_authorized" access="Public">
+    <cfreturn session.user.all_site_access>
+  </cffunction>
+
+
+  <cffunction name="switch_site_form" output="true" access="Public">
+    <cfset local.view_data.current_site = this.params.current_site>
+    <cfreturn render_partial(view_data=local.view_data)>
+  </cffunction>
+
+
+  <cffunction name="switch_site" output="true" access="Public">
+    <cfset session.user.site_number = this.params.new_site_number>
+    <cfreturn redirect('/items/fit_results')>
+  </cffunction>
+
+</cfcomponent>

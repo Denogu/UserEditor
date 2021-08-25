@@ -1,0 +1,50 @@
+<cfcomponent extends="core.model">
+
+  <cffunction name="table_name" access="public">
+    <cfreturn "iwrs_emergency_unblindings"> 
+  </cffunction>
+
+
+  <cffunction name="all" access="public" returntype="Query">
+    <cfquery name="local.all_recs" datasource="#application.dsn#">
+      SELECT eu.*, p.ssn, p.subject_number, p.check_code
+      FROM #this.table_name()# eu
+      INNER JOIN pii.iwrs_participants p
+      ON p.id = eu.participant_id
+    </cfquery>
+
+    <cfreturn local.all_recs>
+  </cffunction>
+
+
+  <cffunction name="unblind_participant" access="public">
+    <cfargument name="participant" required="true">
+    <cfargument name="justification" type="string" required="true">
+    
+    <cfif Trim(arguments.justification) EQ ''>
+      <cfthrow message="You must provide a non blank justification for unblinding the participant." type="EmergencyUnblinding.UnblindParticipant.MissingJustification">
+    </cfif>
+
+    <cfif participant.is_participant_unblinded()>
+      <cfthrow message="The participant has already been unblinded." type="EmergencyUnblinding.UnblindParticipant.ParticipantAlreadyUnblinded">
+    </cfif>
+
+    <cftransaction>
+      <cfset local.emergency_unblinding = createObject("models.emergency_unblinding").create({
+        participant_id = arguments.participant.id,
+        justification = arguments.justification,
+        user_name = session.user.name
+      })>
+      <cfset participant.unblind()>
+    </cftransaction>
+
+    <cfreturn local.emergency_unblinding>
+  </cffunction>
+
+
+  <cffunction name="participant" access="public">
+    <cfreturn createObject("models.participant").init(this.participant_id)>
+  </cffunction>
+
+
+</cfcomponent>

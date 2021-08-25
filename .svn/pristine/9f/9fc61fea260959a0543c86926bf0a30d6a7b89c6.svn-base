@@ -1,0 +1,363 @@
+<cfcomponent output="false">
+
+  <cfset variables.id = 0>
+	<cfset variables.fields = StructNew()>
+
+	<cffunction name="init" access="public">
+    <cfargument name="id" required="true" type="numeric">
+    
+    <cfset variables.id = id>
+    <cfset set_member_variables()>
+    <cfset build_associations()>
+
+    <cfreturn this>
+  </cffunction>
+
+
+
+  <!--- Name of the component file --->
+  <cffunction name="model_name" access="public" output="false" returntype="string">
+    <cfset var path_to_model = GetCurrentTemplatePath()>
+    <cfset var file_name = GetFileFromPath(path_to_model)>
+    <cfreturn replace(file_name, ".cfc", "")>
+  </cffunction>
+
+  <!--- Name of component file with an 's' tacked on to the end --->
+  <cffunction name="table_name" access="public" output="false" returntype="string">
+    <cfreturn "#this.model_name()#s"> 
+  </cffunction>
+
+
+
+
+	<cffunction name="count" output="false" access="public" returntype="numeric">
+		<cfquery name="countRecs" datasource="#application.dsn#" maxrows="1">
+			SELECT COUNT(*) AS rec_count FROM [#this.table_name()#] 
+		</cfquery>
+	
+  	<cfreturn countRecs.rec_count>
+	</cffunction>
+
+  <cffunction name="db_field_names" output="false" access="public" returntype="array">
+    <cfset var field_names = ArrayNew(1)>
+    <cfset var field_information = db_field_information()>
+
+    <cfloop index="i" from="1" to="#ArrayLen(field_information)#">
+      <cfset field_names[i] = field_information[i].name>
+    </cfloop>
+
+    <cfreturn field_names>
+  </cffunction>
+
+  <cffunction name="db_field_information" output="false" access="public" returntype="array">
+    <cfset var field_information = ArrayNew(1)>
+    
+    <cfquery name="get_field_information" datasource="#application.dsn#">
+      SELECT column_name, ordinal_position, is_nullable, data_type, character_maximum_length FROM information_schema.columns
+      WHERE table_name = '#this.table_name()#'
+    </cfquery>
+
+    <cfloop query="get_field_information">
+      <cfset var tmp_struct = StructNew()>
+      <cfset tmp_struct.name = #column_name#>
+      <cfset tmp_struct.position = #ordinal_position#>
+      <cfset tmp_struct.is_nullable = #is_nullable#>
+      <cfset tmp_struct.data_type = #data_type#>
+      <cfset tmp_struct.max_length = #character_maximum_length#>
+      <cfset ArrayAppend(field_information, tmp_struct)>
+    </cfloop>
+
+    <cfreturn field_information>
+  </cffunction>
+
+	<cffunction name="create" access="public">
+  	<cfargument name="attributes" required="true" type="struct">
+    <cfset var attributes_for_create = force_transformations(attributes)>
+  	<cfset validate_parameters(attributes_for_create, false)>
+  	<cfset before_create(attributes_for_create)>
+
+    <cfset var field_information = db_field_information()>
+ 
+    <cftransaction>
+          
+      <cfquery name='create_new_rec' datasource='#application.dsn#'>
+        INSERT INTO [#table_name()#](#fields_for_create(attributes_for_create)#[created_at],[updated_at],[user_name])
+        VALUES(
+          <cfloop index="i" from="1" to="#ArrayLen(field_information)#">
+            <cfif StructKeyExists(attributes, field_information[i].name)>
+              <cfqueryparam value='#attributes_for_create[field_information[i].name]#' cfsqltype='#cfsqltype_for(field_information[i].data_type)#'>,
+            </cfif>
+          </cfloop>
+        GetDate(),GetDate(), '#userName()#')
+      </cfquery>
+      
+    	<cfquery name="last_rec" datasource="#application.dsn#">
+      	SELECT max(id) as id FROM [#table_name()#] 
+    	</cfquery>
+  	</cftransaction>
+
+  	<cfreturn this.init(last_rec.id)>
+
+	</cffunction>
+
+
+
+  <cffunction name="db_fields" output="false" access="public" returntype="struct">
+    <cfset var fields = StructNew()>
+    <cfset var field_names = db_field_names()>
+    <cfset var rec = find_by_id(Variables.id)>
+
+    <cfloop index="i" from="1" to="#ArrayLen(field_names)#">
+      <cfset fields["#field_names[i]#"] = rec["#field_names[i]#"]>
+    </cfloop>
+
+    <cfreturn fields>
+  </cffunction>
+
+	<cffunction name="find_by_id" output="false" access="public">
+    <cfargument name="id" required="true" type="numeric">
+
+		<cfquery name="rec" datasource="#application.dsn#" maxrows="1">
+			SELECT * FROM [#this.table_name()#]
+        WHERE
+          [id] = <cfqueryparam value="#id#" cfsqltype="CF_SQL_INTEGER" null="false"> 
+		</cfquery>  
+	
+    <cfif rec.recordCount is not 1>
+      <cfthrow message="#this.model_name()# not found.">
+    </cfif>
+
+  	<cfreturn rec>
+	</cffunction>
+
+  <cffunction name="find_by" output="false" access="public" returntype="array">
+    <cfargument name="field_name" type="string" required="true">
+    <cfargument name="field_value" type="string" required="true">
+		
+    <cfset var arr = ArrayNew(1)>
+
+    <cfquery name="recs" datasource="#application.dsn#">
+			SELECT ID FROM [#this.table_name()#]
+        WHERE
+          [#arguments.field_name#] = '#field_value#' 
+		</cfquery>
+    
+    <cfloop query="recs">
+      <cfset ArrayAppend(arr, CreateObject("component","#application.root#.models.#this.model_name()#").init(#id#))>
+    </cfloop>  
+
+    <cfreturn arr>
+  </cffunction>
+
+  <cffunction name="update" access="public" returntype="void">
+    <cfargument name="attributes" required="true" type="struct">
+    <cfset attributes_for_update = force_transformations(attributes)>
+    <cfset attributes_for_update = remove_attributes_that_have_not_changed(attributes_for_update)>
+    <cfset validate_parameters(attributes_for_update, true)>
+    <cfset before_update(attributes_for_update)>
+    <cfset var field_information = db_field_information()>
+
+		<cfquery name="update_rec" datasource="#application.dsn#">
+    	UPDATE [#table_name()#]
+				SET
+          <cfloop index="i" from="1" to="#ArrayLen(field_information)#">
+            <cfif StructKeyExists(attributes_for_update, field_information[i].name)>
+              [#field_information[i].name#] = <cfqueryparam value='#attributes_for_update[field_information[i].name]#' cfsqltype='#cfsqltype_for(field_information[i].data_type)#'>,
+            </cfif>
+          </cfloop>
+          [updated_at] = GETDATE(),
+         	[user_name] = <cfqueryparam value="#userName()#" cfsqltype="CF_SQL_VARCHAR" null="No">
+        WHERE [id] = <cfqueryparam value="#Variables.id#" cfsqltype="CF_SQL_INTEGER" null="No">
+    </cfquery>
+		
+		<cfset set_member_variables()>
+  </cffunction>
+
+
+<!--- ############################################ package Methods #################################### --->
+
+  <cffunction name="belongs_to" access="package" output="false" returntype="void">
+    <cfset this.belongs_to_associations = Arguments>
+  </cffunction>
+
+
+  <cffunction name="has_many_association_with" access="package" output="false" returntype="void">
+    <cfset this.has_many_associations = Arguments>
+  </cffunction>
+ 
+  
+  <cffunction name="validates_presence_of" access="package" output="false" returntype="void">
+    <cfset this.non_blank_fields = Arguments>
+  </cffunction>
+
+  <cffunction name="force_uppercase_of" access="package" output="false" returntype="void">
+    <cfset this.uppercase_fields = ARGUMENTS>
+  </cffunction>
+
+  <cffunction name="validates_uniqueness_of" access="package" output="false" returntype="void">
+    <cfset this.unique_fields = Arguments>
+  </cffunction>
+
+<!--- ############################################ Private Methods #################################### --->
+
+  <cffunction name="before_create" output="false" access="private">
+    <cfargument name="attributes" type="struct" required="true">
+  </cffunction>
+
+
+  <cffunction name="before_update" output="false" access="private">
+    <cfargument name="attributes" type="struct" required="true">
+  </cffunction>
+
+
+   <cffunction name="build_associations" access="private" output="false" returntype="void">
+    <cfif StructKeyExists(this,"has_many_associations")>
+      <cfloop index="model_name" list="#arrayToList(this.has_many_associations)#">
+        <cfset var model = createObject("component","#application.root#.models.#model_name#")>
+        <cfset this["#model.table_name()#"] = model.find_by("#this.model_name()#_id", LSParseNumber(this.id))>
+      </cfloop>
+    </cfif>
+    <cfif StructKeyExists(this,"belongs_to_associations")>
+      <cfloop index="model_name" list="#arrayToList(this.belongs_to_associations)#">
+        <cfif not StructKeyExists(this, "#model_name#_id")>
+          <cfthrow message="#this.table_name()# cannot belong to #model_name#.  It does not have a '#model_name#_id' field.">
+        </cfif>
+        <cfset var model = createObject("component","#application.root#.models.#model_name#")>
+        <cfset var foreign_key = evaluate("this.#model_name#_id")>
+        <cfset this["#model_name#"] = model.find_by_id(foreign_key)>
+      </cfloop>
+    </cfif>
+  </cffunction>
+
+
+  <cffunction name="cfsqltype_for" output="false" access="private" returntype="string">
+    <cfargument name="sql_data_type" required="true" type="string">
+    <cfset var look_up_table = StructNew()>
+    <cfset look_up_table['int'] = "CF_SQL_INTEGER">
+    <cfset look_up_table['datetime'] = "CF_SQL_DATE">
+    <cfset look_up_table['varchar'] = "CF_SQL_VARCHAR">
+    <cfset look_up_table['bit'] = "CF_SQL_BIT">
+    <cfreturn look_up_table["#sql_data_type#"]>
+  </cffunction>
+
+
+  <cffunction name="fields_for_create" output="false" access="private" returntype="string">
+    <cfargument name="attributes" required="true" type="struct">
+    <cfset var str = ''>
+    <cfset var field_information = db_field_information()>
+    <cfloop index="i" from="1" to="#ArrayLen(field_information)#">
+      <cfif StructKeyExists(attributes, field_information[i].name)>
+        <cfset str = str & "[#field_information[i].name#],">
+      </cfif>
+    </cfloop>
+    <cfreturn str>
+  </cffunction>
+
+
+  <cffunction name="force_transformations" output="false" access="private" returntype="struct">
+    <cfargument name="attributes" required="true" type="struct">
+    <cfset var transformed_attrs = attributes>
+    
+    <cfif StructKeyExists(this,"uppercase_fields")>
+      <cfloop index="fn" list="#arrayToList(this.uppercase_fields)#">
+        <cfif StructKeyExists(transformed_attrs, '#fn#')>
+          <cfset transformed_attrs['#fn#'] = UCASE(transformed_attrs['#fn#'])>
+        </cfif>
+      </cfloop>
+    </cfif>
+
+    <cfreturn transformed_attrs>
+  </cffunction>
+
+  <cffunction name="set_member_variables" output="false" access="private" returntype="void">
+		<cfset var fields = db_fields()>
+    <cfloop collection=#fields# item="member_variable_field_name">
+      <cfset this["#member_variable_field_name#"] = fields["#member_variable_field_name#"]>
+    </cfloop>
+  </cffunction>
+
+
+  <cffunction name="validate_parameters" output="false" access="private">
+    <cfargument name="attributes" type="struct" required="true">
+    <cfargument name="is_update" type="Boolean" default="false">
+    
+    <cfset validate_non_blank_fields(attributes, is_update)>
+    <cfset validate_unique_fields(attributes)>
+  </cffunction>
+
+  <cffunction name="validate_non_blank_fields" output="false" access="private">
+    <cfargument name="attributes" type="struct" required="true">
+    <cfargument name="is_update" type="Boolean" default="false">
+
+    <cfif StructKeyExists(this,"non_blank_fields")>
+      <cfloop index="fn" list="#arrayToList(this.non_blank_fields)#">
+        <cfif not StructKeyExists(attributes, '#fn#')>
+          <cfif not StructKeyExists(this,'#fn#')>
+            <cfif arguments.is_update is false>
+              <cfthrow message="#fn# cannot be null.">
+            </cfif>  
+          </cfif>
+        <cfelseif attributes['#fn#'] is ''>
+          <cfthrow message="#fn# cannot be blank.">
+        </cfif>
+      </cfloop>
+    </cfif>
+  </cffunction>
+
+  <!--- If the model has the validates_uniqueness_of requirement for fields,
+        Loop through the fields and check to see if there is already a record with
+        the specified field value in the database.  If there is a record,
+        throw an error. --->
+  <cffunction name="validate_unique_fields" output="false" access="private">
+    <cfargument name="attributes" type="struct" required="true"> 
+
+    <cfif StructKeyExists(this,"unique_fields")>
+      <cfloop index="unique_field_name" list="#arrayToList(this.unique_fields)#">
+        <cfif StructKeyExists(arguments.attributes, '#unique_field_name#')>
+          <cfset var field_value = arguments.attributes['#unique_field_name#']>
+
+          <cfif is_field_value_present_in_database(unique_field_name, field_value) is true>
+            <cfthrow message="#unique_field_name# must be unique.">
+          </cfif>
+        </cfif>
+      </cfloop>
+    </cfif>
+  </cffunction>
+
+  <cffunction name="is_field_value_present_in_database" output="false" access="private" returnType="Boolean">
+    <cfargument name="field_name" type="string" required="true">
+    <cfargument name="field_value" type="string" required="true">
+     
+    <cfquery name="checking_table_for_field_value" datasource="#application.dsn#" maxrows="1">
+     SELECT count(*) as rec_count from [#this.table_name()#]
+     WHERE [#arguments.field_name#] = '#arguments.field_value#'
+    </cfquery>
+    
+    <cfif checking_table_for_field_value.rec_count is 0>
+      <cfreturn false>
+    </cfif>
+
+    <cfreturn true> 
+  </cffunction>
+
+  <!--- When a record is updated, remove all attributes that have been specified but have not changed.
+        If we try to update a value that has not changed, it will appear as a non unique value and may
+        cause a validation error to fire in error.  Best to remove those attributes before validation checks are run. --->
+  <cffunction name="remove_attributes_that_have_not_changed" output="false" access="private" returntype="Struct">
+    <cfargument name="original_attributes" type="Struct" required="true">
+    <cfset var new_attributes = StructNew()>
+
+    <cfloop collection=#original_attributes# item="field_name_from_original_attributes">
+      <cfset var field_value = original_attributes[field_name_from_original_attributes]>
+      
+      <cfif StructKeyExists(this, field_name_from_original_attributes)>
+        <cfset var original_value = this["#field_name_from_original_attributes#"]>
+        <cfif compare(original_value,field_value) is not 0>
+          <cfset new_attributes[field_name_from_original_attributes] = field_value>
+        </cfif>
+      </cfif>
+    </cfloop>
+    
+    <cfreturn new_attributes>
+  </cffunction>
+</cfcomponent>

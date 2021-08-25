@@ -1,0 +1,74 @@
+<cfcomponent output="false" extends="core.model">
+	
+  <cffunction name="table_name" returntype="string">
+    <cfreturn 'pii.orders'>
+  </cffunction>
+  	
+<!--- Get all of the order records for a specified participant. --->
+  <cffunction name="all_for_participant" access="public" returntype="Query">
+    <cfargument name="participant_id" type="numeric" required="true">
+
+    <cfquery name="local.order_recs" datasource="#application.dsn#">
+      SELECT * 
+      FROM #this.table_name()#  
+      WHERE participant_id = <cfqueryparam value="#arguments.participant_id#" cfsqltype="CF_SQL_INTEGER">
+      ORDER BY id desc
+    </cfquery>
+
+    <cfreturn local.order_recs>
+  </cffunction>
+  
+
+<!--- Get all of the order records for the user's current site. --->
+  <cffunction name="all_for_site" access="public" returntype="Query">
+
+    <cfquery name="local.order_recs" datasource="#application.dsn#">
+      SELECT o.*, p.subject_number
+      FROM #this.table_name()# o
+      INNER JOIN pii.iwrs_participants p 
+      ON o.participant_id = p.id      
+      WHERE p.site_number = <cfqueryparam value="#session.user.site_number#" cfsqltype="CF_SQL_INTEGER">
+      ORDER BY id desc
+    </cfquery>
+
+    <cfreturn local.order_recs>
+  </cffunction>
+
+  
+<!--- Get all of the item records for the order. --->  
+  <cffunction name="items" access="public" returntype="Query">
+    <cfreturn createObject("models.item").all_for_order(this.id)>
+  </cffunction>
+
+
+<!--- Get the last order for the participant that has a verified_at date which means it should have been shipped. --->
+  <cffunction name="participants_last_verified_order" access="public">
+    <cfargument name="participant_id" type="numeric" required="true">
+
+    <cfset local.order_id = get_participants_last_verified_order_id(arguments.participant_id)>
+    <cfreturn createObject("models.order").init(local.order_id)>
+  </cffunction>
+
+
+<!--- Private Methods --->
+
+
+   <cffunction name="get_participants_last_verified_order_id" access="private" returntype="numeric">
+    <cfargument name="participant_id" type="numeric" required="true">
+
+    <cfquery name="local.order_id" datasource="#application.dsn#" maxrows="1">
+      SELECT TOP 1 id 
+      FROM #this.table_name()#
+      WHERE participant_id = <cfqueryparam value="#arguments.participant_id#" cfsqltype="CF_SQL_INTEGER">
+        and verified_at is not null
+      ORDER BY verified_at DESC
+    </cfquery>
+
+    <cfif local.order_id.recordCount EQ 0>
+      <cfthrow message="The participant does not have any verified orders" type="Order.GetParticipantsLastVerifiedOrderID.NoRecord">
+    </cfif>
+
+    <cfreturn local.order_id.id>
+  </cffunction>
+   
+</cfcomponent>

@@ -1,0 +1,294 @@
+<cfcomponent name="randomization_form" output="false">
+	
+  <!--- Database Meta Data (DBMD) --->
+	<cfset variables.table_name = 'iwrs_randomization_forms'>
+	<cfset variables.field_names = ['form_number', 'site_number', 'subject_number', 'alpha_code', 'reason_for_submission', 'is_eligible', 'user_name', 'created_at', 'utc_offset']>
+    
+	
+	<!--- ?????????????????????TODO. check the final randomization list. ????????????????????????--->
+	<cfset variables.cocaine_use_days_mapping = { "8 OR MORE DAYS"= 1,
+												  "LESS THAN 8 DAYS"= 2	
+												}/>
+    <cfset variables.continued_viewing_module_mapping = { "NO"= 1,
+												  "YES"= 2
+												}/>
+    <cfset variables.alcohol_benzodiazepine_dependence_mapping = { "NO"= 1,
+												  "YES"= 2
+												}/>                                            
+    
+    <!--- Finds the record in the database by the record's id.  Builds an object with member variables defined from the table's
+	      field names and values. --->
+	<cffunction name="init" output="false" access="Public">
+		<cfargument name="id" required="true" type="numeric">
+		
+		<cfset this.id = arguments.id>
+		<cfset build_orm_object(arguments.id)>
+		<cfreturn this>
+	</cffunction>
+
+
+
+
+
+
+
+  <cffunction name="save_randomization_form" access="public" output="false">
+  	<cfargument name="subject_number" type="string" required="true">
+    <cfargument name="alpha_code" type="string" required="true">
+    <cfargument name="site_number" type="string" required="true">
+    <cfargument name="gender" type="string" required="true" >
+    <cfargument name="utc_offset" type="string" required="true">
+    <cfargument name="reason_for_submission" type="string" required="true">
+    <cfargument name="form_answers" type="struct" required="true">
+    
+    
+       
+     <cfset local.form_elements = StructKeyArray(arguments.form_answers)>
+       
+       
+    <cflock scope="session" timeout="5" type="exclusive"><!--- Prevents duplicate submissions in rare self-race conditions (i.e. user POSTS request multiple times before processing is finished). --->
+    
+    	<!--- verify the subject number has been associated with the alpha code for given site. An error message would be thrown by the called function if no matching records are found.--->
+       <cfset local.subject_record = createObject("component", "models.alpha_code").find_by_subject_number_and_alpha_code(arguments.subject_number, arguments.alpha_code, arguments.site_number) />
+       
+                     
+       <cfif is_eligible_for_randomization(arguments.subject_number, arguments.alpha_code, arguments.site_number, arguments.form_answers)>
+         <cfset local.is_eligible = 1>
+       <cfelse>
+         <cfset local.is_eligible = 0>
+         <cfthrow type="custom" message="The participant is not eligible for randomization assignment." />
+       </cfif>
+       
+       <!---???????????????straticfication variables. TODO. Check final list??????????????? --->
+       <cfset cocaine_use_days = variables.cocaine_use_days_mapping['#form_answers["COCAINE_USE_DAYS"]#']/>
+       <cfset continued_viewing_module = variables.continued_viewing_module_mapping['#form_answers["CONTINUED_VIEWING_MODULE"]#'] />
+       <cfset alcohol_benzodiazepine_dependence = variables.alcohol_benzodiazepine_dependence_mapping['#form_answers["ALCOHOL_BENZODIAZEPINE_DEPENDENCE"]#'] />
+       
+        <!--- Save the form--->       
+        
+        <cftransaction>
+        
+           <cfif local.is_eligible EQ 1> <!--- randomize the participant--->
+              <cfinvoke component="models.participant" method="randomize" returnvariable="local.randomization_details">
+                <cfinvokeargument name="subject_number" value="#arguments.subject_number#">   
+                <cfinvokeargument name="alpha_code" value="#arguments.alpha_code#">
+                <cfinvokeargument name="gender" value="#arguments.gender#">
+                <cfinvokeargument name="cocaine_use_days" value="#cocaine_use_days#"> 
+                <cfinvokeargument name="continued_viewing_module" value="#continued_viewing_module#"> 
+                <cfinvokeargument name="alcohol_benzodiazepine_dependence" value="#alcohol_benzodiazepine_dependence#">  
+                <cfinvokeargument name="site_number" value="#arguments.site_number#">       
+                <cfinvokeargument name="client_timezone_offset" value="#arguments.utc_offset#">
+              </cfinvoke>
+            </cfif>
+            
+           <cfquery name="local.save_form" datasource="#application.dsn#" result="local.new_form">
+            insert into [#variables.table_name#](
+            [site_number], [subject_number], [alpha_code], [reason_for_submission], [is_eligible], [gender], [utc_offset], [user_name]
+                  )
+              Values
+              (
+                <cfqueryparam value="#arguments.site_number#" cfsqltype="CF_SQL_VARCHAR" maxlength="3" null="no">,
+                <cfqueryparam value="#arguments.subject_number#" cfsqltype="CF_SQL_VARCHAR" maxlength="12" null="no">,
+                <cfqueryparam value="#arguments.alpha_code#" cfsqltype="CF_SQL_VARCHAR" maxlength="4" null="no">,
+                <cfqueryparam value="#arguments.reason_for_submission#" cfsqltype="CF_SQL_VARCHAR">,
+                <cfqueryparam value="#local.is_eligible#" cfsqltype="CF_SQL_BIT" null="no">,
+                <cfqueryparam value="#arguments.gender#" cfsqltype="CF_SQL_VARCHAR" maxlength="10">,
+                <cfqueryparam value="#arguments.utc_offset#" cfsqltype="cf_sql_integer">,
+                <cfqueryparam value="#session.user.name#" cfsqltype="CF_SQL_VARCHAR" null="no">               
+              )
+          </cfquery>
+          
+          
+          <cfset local.randomization_form_id = local.new_form.generatedKey>
+    
+          <cfquery name="local.save_form_responses" datasource="#application.dsn#">
+              INSERT INTO [iwrs_randomization_form_responses] ([randomization_forms_id], [field_name], [user_response])
+              VALUES
+              
+              <cfloop from="1" to="#ArrayLen(local.form_elements)#" index="i">
+                  <cfif i GT 1>
+                      ,
+                  </cfif>
+                   ( 
+                      <cfqueryparam value="#local.randomization_form_id#" cfsqltype="cf_sql_integer">,
+                      <cfqueryparam value="#local.form_elements[i]#" cfsqltype="cf_sql_varchar" maxlength="128">,
+                      <cfqueryparam value="#arguments.form_answers[local.form_elements[i]]#" cfsqltype="cf_sql_varchar" maxlength="512">
+                   )		        
+              </cfloop>
+              
+          </cfquery>	
+        </cftransaction>
+       
+   </cflock>     
+  <cfreturn local.new_form.generatedKey>
+  </cffunction>
+  
+  
+  
+   
+ 
+ 
+  <!--- Get the array of validation errors. If array is empty, subject is eligible.--->
+  <cffunction name="is_eligible_for_randomization" access="public" output="false" returntype="Boolean">
+      <cfargument name="subject_number" type="string" required="true">
+      <cfargument name="alpha_code" type="string" required="true">
+      <cfargument name="site_number" type="string" required="true">
+      <cfargument name="form_answers" type="struct" required="true">
+      
+      <cfset form_answers.study_site_number = arguments.site_number />
+      <cfset validation_errors = get_validation_errors(arguments.subject_number, arguments.alpha_code, arguments.form_answers)>
+      <cfif ArrayIsEmpty(validation_errors)>
+        <cfreturn true>
+      </cfif>
+      <cfreturn false>
+  </cffunction> 
+ 
+ 
+ 
+ 
+
+  <cffunction name="get_validation_errors"  access="public" output="false" returntype="array">
+  	<cfargument name="subject_number" type="string" required="true">
+    <cfargument name="alpha_code" type="string" required="true">
+    <cfargument name="form_answers" type="struct" required="true">
+    
+    <cfset local.v_errors = validation_errors(arguments.subject_number, arguments.alpha_code, arguments.form_answers) />
+  	
+    <cfreturn local.v_errors />
+  </cffunction>
+
+
+  
+  <cffunction name="validation_errors" access="public" output="false">
+  	<cfargument name="subject_number" type="string" required="true">
+    <cfargument name="alpha_code" type="string" required="true">
+    <cfargument name="form_answers" type="struct" required="true">
+    
+    <cfset local.errors = ArrayNew(1)/>
+    
+    <!---Subject Number. Confirm if right format ???????????????--->
+    <cfif refind("^\d{4}$", arguments.subject_number) is 0>
+     kpo <cfset ArrayAppend(local.errors,"Subject Number should be 4 digits.") />
+    </cfif>
+    
+    <!---Alpha Code. Confirm if right format ??????????????? --->
+    <cfif refind("^[a-zA-Z]{4}$", arguments.alpha_code) is 0>
+      <cfset ArrayAppend(local.errors,"Alpha Code should be 4 characters.") />
+    </cfif>
+    
+        
+    <!--- Check if alpha code record exists at site --->
+    <cftry>
+	  <cfset local.alpha_code_rec = createObject("component","models.alpha_code").find_by_subject_number_and_alpha_code(arguments.subject_number, arguments.alpha_code, arguments.form_answers.study_site_number) />
+                 
+       <!--- Check if participant has a randomization record. they should not have.--->
+       <cfset local.randomization_record_exists = createObject("component","models.participant").validate_participant_eligibility(arguments.subject_number, arguments.alpha_code) />
+        
+      <!--- Check if randomization assignment exists. It should not exist.--->
+      <cftry>
+      		<cfset local.randomization_assignment_exists = createObject("component","models.assignment").get_assignment_details(subject_number='#arguments.subject_number#', alpha_code='#arguments.alpha_code#', assignment_type_id = '2') />
+            <cfset ArrayAppend(local.errors, "The participant already has a randomization assignment record." )/> 
+            <cfreturn local.errors />
+      <cfcatch type="custom">      		 
+      </cfcatch>
+      </cftry>     
+            
+      <!--- Check if runin assignment exists for subject. It should exist.--->
+      <cftry>
+	  	  <cfset local.runin_assignment_rec = createObject("component","models.assignment").get_assignment_details(subject_number='#arguments.subject_number#', alpha_code='#arguments.alpha_code#', assignment_type_id = '1') />
+      <cfcatch type="custom">
+      	  <cfthrow type="custom" message="No Run-in Assignment record exists for the participant." />
+      </cfcatch>
+      </cftry>
+      
+       <!--- check if day of randomization is EXACTLY on the 8th day following enrollment (Study Day 8) --->
+       <cfif DateCompare(DateAdd('d', 7, local.runin_assignment_rec.created_at), NOW(), 'd') NEQ 0 >
+        	<cfset ArrayAppend(local.errors, "Randomization MUST occur on the 8th day following enrollment (Study Day 8).") />
+       </cfif>
+    <cfcatch type="custom">
+       <cfset ArrayAppend(local.errors, cfcatch.message) />
+       <cfreturn local.errors />
+    </cfcatch>
+    </cftry> 
+    
+    
+    
+       
+      
+    <!--- Check if answer to is subject female provided--->
+    <cfif Ucase(arguments.form_answers.is_female) NEQ 'YES' and Ucase(arguments.form_answers.is_female) NEQ 'NO'>
+    	<cfset ArrayAppend(local.errors,"Answer to 'Is subject female?' must not be blank.") />
+    </cfif>
+    
+    <cfif Ucase(arguments.form_answers.is_female) EQ 'YES'>
+    	<cfif arguments.form_answers.pregnancy_test_today NEQ 'YES' >
+        	<cfset ArrayAppend(local.errors,"Pregnancy test must be performed in clinic today.") />
+        <cfelse>        
+		  <cfif arguments.form_answers.pregnancy_test_result NEQ 'NEGATIVE' >
+              <cfset ArrayAppend(local.errors,"The result of pregnancy test performed in clinic today must be negative.") />
+          </cfif>
+        </cfif>  
+    </cfif>
+    
+        
+    
+    <!--- check if answer to 'Q4 Number of subject-reported cocaine use days during the 30 days immediately prior to screening' is provided --->
+    <cfif  Ucase(arguments.form_answers.cocaine_use_days) NEQ '8 OR MORE DAYS' and  Ucase(arguments.form_answers.cocaine_use_days) NEQ 'LESS THAN 8 DAYS'>
+    	<cfset ArrayAppend(local.errors,"Answer to 'Number of subject-reported cocaine use days during the 30 days immediately prior to screening?' must not be blank.") />
+    </cfif>
+    
+    
+    
+    <!--- check if answer to 'Q5 Did subject continue viewing the computer-based Alcohol Intervention on Study Day 8?  ' is provided --->
+    <cfif  Ucase(arguments.form_answers.continued_viewing_module) NEQ 'YES' and  Ucase(arguments.form_answers.continued_viewing_module) NEQ 'NO'>
+    	<cfset ArrayAppend(local.errors,"Answer to 'Did subject continue viewing the computer-based Alcohol Intervention on Study Day 8?' must not be blank.") />
+    </cfif>
+    
+    
+    
+    <!--- check if answer to 'Q6 Does the subject have current alcohol and/or benzodiazepine dependence?' is provided --->
+    <cfif  Ucase(arguments.form_answers.alcohol_benzodiazepine_dependence) NEQ 'YES' and  Ucase(arguments.form_answers.alcohol_benzodiazepine_dependence) NEQ 'NO'>
+    	<cfset ArrayAppend(local.errors,"Answer to 'Does the subject have current alcohol and/or benzodiazepine dependence?' must not be blank.") />
+    </cfif>
+    
+    
+    
+     <!--- check if subject is willing to be randomized into the study--->
+    <cfif  Ucase(arguments.form_answers.willing_to_randomization) NEQ 'YES' >
+    	<cfset ArrayAppend(local.errors,"Subject must be willing to be randomized into the study.") />
+    </cfif>
+    
+  	<cfreturn local.errors>
+  </cffunction>
+
+
+
+
+  <!--- Get the record, define member variables from record field names and values.--->
+	<cffunction name="build_orm_object" output="false" access="private" returntype="void">
+		<cfargument name="record_id" required="true" type="numeric">
+		<cfset local.rec = find_record_by_id(arguments.record_id)>
+		
+		<cfloop array=#variables.field_names# index="field_name">
+			<cfset this[#field_name#]= local.rec[#field_name#]>
+		</cfloop>
+	</cffunction>
+	
+
+	<!--- Look for a record with the specified id, throw an error if it is not found. --->
+	<cffunction name="find_record_by_id" output="false" access="private" returntype="Query">
+		<cfargument name="id" required="true" type="numeric">
+		<cfquery name="local.record" datasource="#application.dsn#" maxrows="1">
+			SELECT * FROM [#variables.table_name#]
+				WHERE id = <cfqueryparam value="#this.id#" cfsqltype="CF_SQL_INTEGER" null="No">
+		</cfquery>
+		
+		<cfif local.record.recordCount is 0>
+			<cfthrow message="No record found.">
+		</cfif>
+		
+		<cfreturn local.record>
+	</cffunction>
+  
+
+</cfcomponent>

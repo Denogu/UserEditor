@@ -1,0 +1,26 @@
+<cfcomponent extends="iwrs_controller">
+
+  <cffunction name="is_authorized" access="Public">
+    <cfreturn model("role").init(session.user.role_id).is_site_team()
+      OR session.user.is_crpcc>
+  </cffunction>
+
+
+  
+  <!--- Get all of the orders at the user's site and pass to the index template. --->
+  <cffunction name="index" access="Public">
+    <cfset local.view_data.orders = createObject("models.order").all_for_site()>
+    <cfreturn render(view_data=local.view_data)>
+  </cffunction>
+
+
+
+  <cffunction name="details" access="Public">
+    <cfset this.view_data.order = createObject("models.order").init(this.params.id)>
+    <cfset this.view_data.participant = createObject("models.participant").init(this.view_data.order.participant_id)>
+    <cfset this.view_data.items = this.view_data.order.items()>
+    <cfreturn render(view_data=this.view_data)>
+  </cffunction>
+
+
+</cfcomponent>

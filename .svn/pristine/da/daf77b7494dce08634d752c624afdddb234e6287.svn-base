@@ -1,0 +1,87 @@
+<cfoutput>
+<cfif participant.is_active EQ True>
+  <cfset status = 'Actively Taking Study Medication'>
+<cfelse>
+  <cfset status = 'Not Currently Taking Study Medication'>
+</cfif>
+  
+<cftry>
+
+  <cftry>
+    <cfset pa_participant_info = participant.pa_participant()>
+    <cfset date_of_birth = "#DateFormat(pa_participant_info.dob, 'mm/dd/yyyy')#">
+  <cfcatch type="PaParticipant.MissingRecord">
+    <cfset date_of_birth = "No DOB from PA">
+  </cfcatch>
+  </cftry>
+
+  <cfset participant_last_order = participant.last_verified_order()>
+  <cfset days_since_last_order = DateDiff("d", ParseDateTime(participant_last_order.verified_at), NOW())>
+
+  <cfif days_since_last_order lt 60>
+    <cfset last_order_class="alert-success">
+  <cfelseif days_since_last_order gte 60 and days_since_last_order lt 80>
+    <cfset last_order_class="alert-warning">
+  <cfelseif days_since_last_order gte 80>
+    <cfset last_order_class="alert-danger">
+  </cfif>
+
+<cfcatch type="Order.GetParticipantsLastVerifiedOrderID.NoRecord">
+  <cfset last_order_class="alert-info">
+  <cfset days_since_last_order = 'The participant has no orders.'>
+</cfcatch>
+<cfcatch>
+  <cfset last_order_class="alert-danger">
+  <cfset days_since_last_order = '#cfcatch.message#'>
+</cfcatch>
+</cftry>
+
+<h2>
+  <span>#participant.last_name#, #participant.first_name# #participant.middle_name#</span>
+<!---  
+
+Study Team didn't want this...sigh. 
+
+<span style="font-size: .7em;">(#status#)</span>
+    <a id="change_participant_status_link" 
+      class="btn btn-primary" 
+      data-id="#participant.id#" 
+      data-toggle="modal" 
+      data-target="##modal_change_participant_status" 
+      href="#application.url_root#/main.cfm/participants/change_status_form/#participant.id#"
+    >Change Status</a>
+--->
+
+  <span class="pull-right">
+    <a class="btn btn-info" href="#application.url_root#/main.cfm/participants/randomization_certificate/#participant.id#">View Randomization Certificate</a>
+  </span>
+</h2>
+<hr/>
+  <cfif participant.is_participant_unblinded()>
+    <div class="row">
+      <div class="col-sm-12">
+        <div class="alert alert-warning">
+          <h4>NOTE:</h4>
+          <p>This participant has been unblinded. No future prescriptions will be filled for the participant.</p>
+        </div>
+      </div>
+    </div>
+  </cfif>
+  <div class="row">
+    <div class="col-sm-4">
+      <cfinclude template="./_participant_details.cfm">
+    </div>
+    <div class="col-sm-8">
+      <div class="row">
+        <div class="col-sm-4">
+          <div class="alert #last_order_class#" style="text-align: center;">
+            <div style="font-weight: bold; margin-bottom: 1.5em; text-decoration: underline;">Number of Days Since Last Prescription</div>
+            <span style="font-size: 1.3em; font-weight: bold; margin-bottom: 1.5em;">#days_since_last_order#</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<div id="modal_change_participant_status" class="modal fade"></div>
+</cfoutput>

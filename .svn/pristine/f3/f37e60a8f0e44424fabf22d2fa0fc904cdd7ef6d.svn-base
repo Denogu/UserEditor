@@ -1,0 +1,7 @@
+<!--- Check confirmation. --->
+<cfparam name="subject_number" default="">
+<cfparam name="check_code" default="">
+
+
+<cfset response.message = '#message#' />
+<cfoutput>#serializeJSON(response)#</cfoutput>

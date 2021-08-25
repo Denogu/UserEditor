@@ -1,0 +1,25 @@
+<cfcomponent extends="iwrs_controller">
+
+  <cffunction name="is_authorized" access="Public">
+    <cfreturn createObject("component", "models.role").init(session.user.role_id).is_site_team() 
+      OR session.user.is_crpcc> 
+  </cffunction>
+
+
+  <cffunction name="reports" access="Public">
+    <!--- we will look for report name to end in '_report' 
+      Make sure report names do not contain any character other than alphabets and underscore--->
+     
+    <cfif StructKeyExists(this.params, "name") and 
+      IsValid("regex", this.params.name, '[a-zA-Z0-9_]+_report$')>
+
+      <cfset file_name = '#trim(this.params.name)#.cfm' />
+      <cfreturn render(view_path='#this.params.controller#/#file_name#') />   
+      
+    <cfelse> 
+      <cfreturn render_error('Error') /> 
+    </cfif>
+    
+  </cffunction>  
+
+</cfcomponent>

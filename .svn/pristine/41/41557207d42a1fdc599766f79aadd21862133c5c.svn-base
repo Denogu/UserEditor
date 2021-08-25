@@ -1,0 +1,41 @@
+<cfcomponent output="false" extends="core.model">
+	<cffunction name="table_name" returntype="string">
+    <cfreturn 'items'>
+  </cffunction>
+
+  	
+<!--- Get all of the item records for a specified participant. --->
+  <cffunction name="all_for_participant" access="public" returntype="Query">
+    <cfargument name="participant_id" type="numeric" required="true">
+
+    <cfquery name="local.item_recs" datasource="#application.dsn#">
+      SELECT i.*, od.order_id, od.rxNumber 
+      FROM #this.table_name()# i
+      INNER JOIN pii.order_details od
+      ON i.order_detail_id = od.id
+      WHERE i.participant_id = <cfqueryparam value="#arguments.participant_id#" cfsqltype="CF_SQL_INTEGER">
+      ORDER BY i.id desc
+    </cfquery>
+
+    <cfreturn local.item_recs>
+  </cffunction>
+
+
+<!--- Get all of the item records for a specified order. --->
+  <cffunction name="all_for_order" access="public" returntype="Query">
+    <cfargument name="order_id" type="numeric" required="true">
+
+    <cfquery name="local.item_recs" datasource="#application.dsn#">
+      SELECT i.*, od.rxNumber
+      FROM #this.table_name()# i
+      INNER JOIN pii.order_details od
+      ON i.order_detail_id = od.id
+      WHERE od.order_id = <cfqueryparam value="#arguments.order_id#" cfsqltype="CF_SQL_INTEGER">
+      ORDER BY i.id
+    </cfquery>
+
+    <cfreturn local.item_recs>
+  </cffunction>
+
+
+</cfcomponent>

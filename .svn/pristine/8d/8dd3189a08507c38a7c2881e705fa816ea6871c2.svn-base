@@ -1,0 +1,49 @@
+<cfcomponent extends="iwrs_controller">
+
+  <cffunction name="is_authorized" access="Public">
+    <cfreturn session.user.can_manage_users>
+  </cffunction>
+
+
+
+  <cffunction name="records" access="Public">
+    <cfset local.view_data.users = createObject("component","models.user").all_readable() />
+    <cfreturn render(view_data=local.view_data)>
+  </cffunction>
+
+
+
+  <cffunction name="edit" access="Public">
+	  <cfset local.view_data.user = createObject("component", "models.user").init(this.params.id) />
+    <cfset local.view_data.roles = createObject("component", "models.role").all_readable()>
+    <cfreturn render_partial(view_data=local.view_data) />
+  </cffunction>
+
+
+
+  <cffunction name="update" access="Public">
+    <cfset local.result = {is_success= true, message=""} />
+    <cfset local.user_form = StructNew() />
+    <cfset local.user_form['is_authorized'] = 0 />   
+    <!--- This will be undefined if the user unchecks the is_authorized checkbox. --->
+
+    <cfloop collection="#this.params#" item="key">
+      <cfif ArrayContains(['first_name', 'last_name', 'email', 'role_id', 'site_number', 'is_authorized'], lcase(key))>
+          <cfset local.user_form[lcase(key)] = this.params[key] />
+      </cfif> 
+    </cfloop>
+
+    <cftry>
+      <cfset local.user = createObject("component", "models.user").init_from_user_name(this.params['user_name']) />    
+      <cfset local.result = local.user.update_user_details(local.user_form) />
+    <cfcatch type="custom">
+      <cfset local.result.message = cfcatch.Message />
+      <cfset local.result.is_success = false />
+    </cfcatch>
+    </cftry>    
+    <cfreturn render_json(local.result) />
+     
+  </cffunction>
+<!------>
+
+</cfcomponent>

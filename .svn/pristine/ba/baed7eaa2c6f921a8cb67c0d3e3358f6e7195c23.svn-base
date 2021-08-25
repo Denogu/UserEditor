@@ -1,0 +1,50 @@
+<cftry>
+  <cfif not isDefined('participant')>
+    <cfthrow message="You must provide the participant in order to get the participant's medication history.">
+  </cfif>
+
+  <cfset items = participant.items()>
+
+<cfoutput>
+  <h3>Medication History</h3>
+  <div class="table-responsive">
+    <table id="participant_medication_history_table" class="table table-striped  table-bordered">
+      <thead>
+        <th>Bottle Number</th>
+        <th>ABQ Order Number</th>
+        <th>CMOP Rx Number</th>
+        <th>Scanned for Shipping Date</th>
+        <th>Number of Days Since Scanned</th>
+        <th>Returned</th>
+        <th>Returned Scan Date</th>
+        <th>Number of Tablets Returned</th>
+      </thead>
+      <tbody>
+        <cfloop query="items">
+          <cfif returned_at EQ ''>
+            <cfset returned = 'No'>
+          <cfelse>
+            <cfset returned = 'Yes'>
+          </cfif>
+          <cfoutput>
+            <tr id="item_#id#">
+              <td>#HTMLEditFormat(number)#</td>
+              <td>#HTMLEditFormat(order_id)#</td>
+              <td>#HTMLEditFormat(rxNumber)#</td>
+              <td>#DateFormat(created_at,'mm/dd/yyyy')#</td>
+              <td>#DateDiff('d', ParseDateTime(created_at), Now())#</td>
+              <td>#returned#</td>
+              <td>#DateFormat(returned_at,'mm/dd/yyyy')#</td>
+              <td>#quantity_returned#</td>
+            </tr>
+          </cfoutput>
+        </cfloop>
+      </tbody>
+    </table>
+  </div>  
+</cfoutput>
+
+<cfcatch>
+  <cfoutput><div class="alert alert-danger">#cfcatch.message#</div></cfoutput>
+</cfcatch>
+</cftry>

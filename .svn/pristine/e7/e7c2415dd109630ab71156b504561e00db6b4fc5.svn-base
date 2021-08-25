@@ -1,0 +1,5 @@
+<cfif not view_data.is_success>
+  <cfoutput><div class="alert alert-danger">#view_data.error#</div></cfoutput>
+<cfelse>
+  <cfinclude template="./unblinding_certificate.cfm">
+</cfif>

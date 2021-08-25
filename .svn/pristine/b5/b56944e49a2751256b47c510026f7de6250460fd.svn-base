@@ -1,0 +1,8 @@
+<cfif view_data.contains_error>
+  <cfset div_class="alert-danger">
+<cfelse>
+  <cfset div_class="alert-success">
+</cfif>
+<cfoutput>
+  <div class="alert #div_class#">#view_data.response#</div>
+</cfoutput>

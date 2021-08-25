@@ -1,0 +1,175 @@
+//$(document).ready is where you add event handlers to elements.
+$(document).ready(function() {
+  var sn_flag = false;
+  var ac_flag = false;
+  var subject_number = '';
+  var check_code = ''; 
+  
+
+  $('input#subject_number_field').on('keyup change', function() {
+	  subject_number = $(this).val(); 
+    check_code = $('input#check_code_field').val();
+	  sn_flag = verify_input_field(subject_number, '^\\d{7}$', 'subject_number_error_field');  	 
+	  check_record(sn_flag, ac_flag, subject_number, check_code); 	  
+  });
+   
+   
+   $('input#check_code_field').on('keyup change', function() {
+	  check_code = $(this).val();
+	  subject_number = $('input#subject_number_field').val(); 
+	  ac_flag = verify_input_field(check_code, '^[a-zA-Z]{4}$', 'check_code_error_field'); 
+	  check_record(sn_flag, ac_flag, subject_number, check_code); 	  
+   });
+
+
+  $('.btn-group-validation').on('change', function() {
+    var el = $(this);
+    var has_error = has_btn_group_validation_error(el);    
+    add_btn_group_validation_feedback(el, has_error); 
+  });
+
+
+   // if user selects 'yes' on Q1 then Q2 would be enabled, else Q2 would be disabled and reset to blank
+   $('input[name="is_icf_on_file"]').on('change', function() {
+	   if($(this).val().toUpperCase() == 'YES') {
+		   $('fieldset#icf_with_pharmacist_field').attr('disabled', false);
+	   } else {
+		   $('input[id="icf_with_pharmacist_blank"]').trigger('click');
+		   $('fieldset#icf_with_pharmacist_field').attr('disabled', true);			   
+	   }
+   });
+   
+
+  $('form[name="randomization_form"]').validator().on('submit', function(e) {
+    var form_el = $(this);
+    //Bootstrap validation
+    if (e.isDefaultPrevented()) {
+      show_btn_group_validation_errors(form_el);
+      return;
+    } else if (has_btn_group_validation_errors(form_el)) {
+      show_btn_group_validation_errors(form_el);
+      return false;
+    }
+
+    e.preventDefault();
+	  $('#ts').val(new Date());   
+	  var serialized_form = form_el.serialize();
+	  var target = form_el.attr('action');
+	  //check if subject is eligible to be randomized
+	  var randomization_eligibility = ajaxRequest('./check_randomization_eligibility', serialized_form);	
+    var eligibility_results = randomization_eligibility.ELIGIBILITY_RESULTS;
+	  if(typeof (eligibility_results) !== 'string') {
+		  if( eligibility_results.ELIGIBLE == 1) {
+			  $('#subject_number_confirmation').html($("input[name='subject_number']").val());
+			  $('#check_code_confirmation').html($("input#check_code_field").val());
+			  $("#randomizationConfirmationModal").modal();	
+			   
+		  } else {
+        var errors_html = "<div class='alert alert-danger'>" + validation_errors_as_html_list(eligibility_results.VALIDATION_ERRORS) + "</div>";
+			  $('#randomization_modal_body').html(errors_html);
+			  $('#randomizationEligibilityModal').modal();
+		  }	
+	  }
+  });
+	 
+	 
+  $("#randomizationConfirmationModal").on('click', '#proceed_button', function() {
+	  $(this).attr('disabled', true);
+	  var form_name = $('form[name="randomization_form"]'); 
+	  $("#randomizationConfirmationModal").modal('hide');
+	  submit_form(form_name);	
+  });  
+   
+   
+  $("#requestSubmittedModal").on('click', '#cancel_button', function() {
+	  window.location.reload(true);
+	}); 
+	 
+	$("#requestSubmittedModal").on('hidden.bs.modal', function() {
+	  window.location.reload(true);
+	});
+   
+});
+
+
+function check_record(sn_flag, ac_flag, subject_number, check_code) {
+  if(sn_flag && ac_flag) {
+    var values = { subject_number: subject_number, check_code: check_code, ts: new Date()};
+    var response = ajaxRequest('../check_codes/_confirm_eligibility', values);
+    $('#record_found').html(response.CONFIRMATION_MESSAGE);
+  } else {
+    $('#record_found').html('');
+  }
+}
+
+
+function submit_form(form_name) {
+  var d = new Date();	  
+	var target = form_name.attr('action');
+	var values = form_name.serialize();		  
+	var server_response = "";	  
+	server_response = ajaxRequest(target, values);
+	if(typeof (server_response) !== 'string') {
+	  if(server_response.IS_SUCCESS == '0'){
+		  $("#randomizationConfirmationModal #proceed_button").attr('disabled', false);
+			show_error_message(server_response.MESSAGE, 'Error');	 
+		} else {
+		  $('#requestSubmittedModal #request_submitted_title').html('Randomization');
+			$('#requestSubmittedModal #request_submitted_body').html('<div class="alert alert-success">'+server_response.MESSAGE+'</div>');	
+			$('#requestSubmittedModal').modal();  
+		}
+	}	  		
+}
+
+
+function show_btn_group_validation_errors(form_el) {
+  var controls = form_el.find('.btn-group-validation');
+  $.each(controls, function() {
+    var el = $(this);
+    if (has_btn_group_validation_error(el))
+      add_btn_group_validation_feedback(el,true); 
+  });
+}
+
+
+function has_btn_group_validation_errors(form_el) {
+  var controls = form_el.find('.btn-group-validation');
+  var has_errors = false;
+  $.each(controls, function() {
+    var el = $(this);
+    if (has_btn_group_validation_error(el))
+      has_errors = true;
+  });
+  return has_errors;
+}
+
+
+function has_btn_group_validation_error(el) {
+  var control_name = el.data('control_name');
+  var required_value = el.data('required_value');
+  var control = $('input:radio[name='+control_name+']:checked');
+  var control_value = control.val();
+  var has_error = true;
+  if (control_value == required_value)
+    has_error = false; 
+  return has_error;
+}
+
+
+function add_btn_group_validation_feedback(el, has_error) {
+  var form_group = el.closest('.form-group');
+  if (has_error) {
+    var error_message = el.data('error');
+    form_group.removeClass('text-success');
+    form_group.addClass('text-danger');
+    form_group.find('label.btn').addClass('custom-error');
+    form_group.find('label.btn').removeClass('custom-success');
+    form_group.find('.with-errors').html('<span class="text-danger">'+error_message+'</span>');
+  } else {
+    form_group.addClass('text-success');
+    form_group.removeClass('text-danger');
+    form_group.find('label.btn').removeClass('custom-error');
+    form_group.find('label.btn').addClass('custom-success');
+    form_group.find('.with-errors').html('');
+  } 
+}

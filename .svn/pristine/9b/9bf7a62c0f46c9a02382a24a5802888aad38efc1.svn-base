@@ -1,0 +1,41 @@
+<cftry>
+  <cfif not isDefined('participant')>
+    <cfthrow message="You must provide the participant in order to get the participant's medication history.">
+  </cfif>
+
+  <cfset orders = participant.orders()>
+
+<cfoutput>
+  <h3>Prescription History</h3>
+  <div class="table-responsive">
+    <table id="participant_prescription_history_table" class="table table-striped  table-bordered">
+      <thead>
+        <th></th>
+        <th>ABQ Order Number</th>
+        <th>CMOP Received Date</th>
+        <th>ABQ Shipped Date</th>
+        <th>ABQ Cancellation Date (If Cancelled)</th>
+        <th>Current Status</th>
+      </thead>
+      <tbody>
+        <cfoutput>
+        <cfloop query="orders">
+          <tr id="order_#id#">
+            <td><a class="btn btn-primary" href="#application.url_root#/main.cfm/orders/#id#/">View Details</a></td>
+            <td>#HTMLEditFormat(id)#</td>
+            <td>#HTMLEditFormat(DateFormat(receivedDateTime,'mm/dd/yyyy'))#</td>
+            <td>#HTMLEditFormat(DateFormat(shipped_at,'mm/dd/yyyy'))#</td>
+            <td>#HTMLEditFormat(DateFormat(cancelled_at,'mm/dd/yyyy'))#</td>
+            <td>#HTMLEditFormat(current_status)#</td>
+          </tr>
+        </cfloop>
+        </cfoutput>
+      </tbody>
+    </table>
+  </div>  
+</cfoutput>
+
+<cfcatch>
+  <cfoutput><div class="alert alert-danger">#cfcatch.message#</div></cfoutput>
+</cfcatch>
+</cftry>

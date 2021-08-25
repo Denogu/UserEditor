@@ -1,0 +1,130 @@
+<cfset order = view_data.order>
+<cfset participant = view_data.participant>
+<cfset items = view_data.items>
+<cfoutput>
+<h2>
+  Order Details 
+  <a class="btn btn-primary pull-right" href="#application.url_root#/main.cfm/participants/#order.participant_id#">View Participant Details</a>
+</h2>
+<hr/>
+<div class="row">
+  <div class="col-md-5 object_details">
+
+    <div class="row">
+      <div class="col-md-6">
+        <dt>Participant ID Number:</dt>
+      </div>
+      <div class="col-md-6">
+        <dd>#participant.subject_number#</dd>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <dt>ABQ Order Number:</dt>
+      </div>
+      <div class="col-md-6">
+        <dd>#order.id#</dd>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <dt>CMOP Received Date:</dt>
+      </div>
+      <div class="col-md-6">
+        <dd>#DateFormat(order.ReceivedDateTime, 'mm/dd/yyyy')#</dd>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <dt>Date Shipped to Participant:</dt>
+      </div>
+      <div class="col-md-6">
+        <dd>#DateFormat(order.shipped_at, 'mm/dd/yyyy')#</dd>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <dt>USPS Tracking Number:</dt>
+      </div>
+      <div class="col-md-6">
+        <dd><a target="_blank" href="#application.usps_tracking_url##order.tracking_number#">#order.tracking_number#</a></dd>
+      </div>
+    </div>
+
+
+    <div class="row">
+      <div class="col-md-6">
+        <dt>Current Status:</dt>
+      </div>
+      <div class="col-md-6">
+        <dd>#order.current_status#</dd>
+      </div>
+    </div>
+
+    <cfif order.cancelled_at NEQ ''>
+      <div class="row">
+        <div class="col-md-6">
+          <dt>Cancellation Date:</dt>
+        </div>
+        <div class="col-md-6">
+          <dd>#DateFormat(order.cancelled_at, 'mm/dd/yyyy')#</dd>
+        </div>
+      </div>
+    <cfelseif order.return_to_sender_at NEQ ''>
+      <div class="row">
+        <div class="col-md-6">
+          <dt>Returned to Sender Date:</dt>
+        </div>
+        <div class="col-md-6">
+          <dd>#DateFormat(order.return_to_sender_at, 'mm/dd/yyyy')#</dd>
+        </div>
+      </div>    
+    </cfif>
+
+  </div>
+</div>
+
+<hr/>
+
+<div>
+<h4>Order Medication</h4>
+<div class="table-responsive">
+  <table id="order_medication_table" class="table table-striped  table-bordered">
+    <thead>
+      <th>Bottle Number</th>
+      <th>CMOP RxNumber</th>
+      <th>Scanned for Shipping Date</th>
+      <th>Number of Days Since Scanned</th>
+      <th>Returned</th>
+      <th>Returned Scan Date</th>
+      <th>Number of Tablets Returned</th>
+    </thead>
+    <tbody>
+      <cfloop query="items">
+        <cfif returned_at EQ ''>
+          <cfset returned = 'No'>
+        <cfelse>
+          <cfset returned = 'Yes'>
+        </cfif>
+        <cfoutput>
+          <tr id="item_#id#">
+            <td>#HTMLEditFormat(number)#</td>
+            <td>#HTMLEditFormat(rxNumber)#</td>
+            <td>#DateFormat(created_at,'mm/dd/yyyy')#</td>
+            <td>#DateDiff('d', ParseDateTime(created_at), Now())#</td>
+            <td>#returned#</td>
+            <td>#DateFormat(returned_at,'mm/dd/yyyy')#</td>
+            <td>#quantity_returned#</td>
+          </tr>
+        </cfoutput>
+      </cfloop>
+    </tbody>
+  </table>
+</div>  
+</div>
+
+</cfoutput>

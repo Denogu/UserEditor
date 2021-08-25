@@ -1,0 +1,80 @@
+<cfcomponent output="false">
+	
+	<!--- Database Meta Data (DBMD) --->
+	<cfset variables.table_name = 'iwrs_sites'>
+	<cfset variables.field_names = ['number', 
+                                  'name',
+								  								'is_training_site',
+                                  'created_at', 
+                                  'updated_at',
+                                  'user_name']>
+	
+
+	<!--- Finds the record in the database by the record's number.  Builds an object with member variables defined from the table's
+	      field names and values. --->
+	<cffunction name="init" output="false" access="Public">
+		<cfargument name="number" required="true" type="string">
+		
+    	<cfset var rec = find_record_by_number(arguments.number)>
+		<cfset this.number = arguments.number>
+		<cfset build_orm_object(rec)>
+		
+		<cfreturn this>
+	</cffunction>
+
+
+<!--- Get all of the records from the 'readable' view. --->
+  <cffunction name="all_readable" output="false" returntype="Query">
+    <cfquery name="local.all_recs" datasource="#application.dsn#">
+      SELECT *
+      FROM [#variables.table_name#]
+    </cfquery>
+
+    <cfreturn local.all_recs>
+  </cffunction>
+
+
+<!--- Get all of the records from the 'readable' view. --->
+  <cffunction name="all_readable_exculding_training_sites" output="false" returntype="Query">
+		<cfset all_readable_records = all_readable()>
+
+    <cfquery name="local.records" dbtype="query">
+      SELECT *
+      FROM all_readable_records
+			WHERE is_training_site <> 1
+    </cfquery>
+
+    <cfreturn local.records>
+  </cffunction>
+
+
+<!--- Private Methods --->
+
+	<!--- Get the record, define member variables from record field names and values.--->
+	<cffunction name="build_orm_object" output="false" access="private" returntype="void">
+		<cfargument name="rec" required="true" type="Query">
+		
+		<cfloop array=#variables.field_names# index="field_name">
+			<cfset this[#field_name#]= rec[#field_name#]>
+		</cfloop>
+	</cffunction>
+	
+
+	<!--- Look for a record with the specified number, throw an error if it is not found. --->
+	<cffunction name="find_record_by_number" output="false" access="private" returntype="Query">
+		<cfargument name="record_number" required="true" type="numeric">
+		
+		<cfquery name="record" datasource="#application.dsn#">
+			SELECT TOP 1 * 
+			FROM [#variables.table_name#]
+			WHERE number = <cfqueryparam value="#arguments.record_number#">
+		</cfquery>
+		
+		<cfif record.recordCount EQ 0>
+			<cfthrow type="custom" message="No record found.">
+		</cfif>
+		
+		<cfreturn record>
+	</cffunction>
+  	
+</cfcomponent>

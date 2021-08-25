@@ -1,0 +1,23 @@
+<cfcomponent output="false" extends="core.model">
+	<cffunction name="table_name" returntype="string">
+    <cfreturn 'items'>
+  </cffunction>
+
+  	
+<!--- Get all of the fit results for the user's site. --->
+  <cffunction name="all" access="public" returntype="Query">
+    
+    <cfquery name="local.all_recs" datasource="#application.dsn#">
+      SELECT subject_number, first_name, last_name, ssn, collected_on=CONVERT(char,collected_on,101), tested_on=CONVERT(char,tested_on,101), notified_of_cprs_entry_at, item_id as actions,
+	    in_cprs = CASE WHEN notified_of_cprs_entry_at IS NULL then 'no' else 'Yes' END,
+	    is_positive = CASE WHEN is_positive = 0 then 'Negative' WHEN is_positive = 1 then 'Positive' else 'Unknown' END
+      FROM readable_subject_results
+      WHERE [site_number] = <cfqueryparam value="#session.user.site_number#" cfsqltype="CF_SQL_VARCHAR" maxlength="5" null="no">
+      ORDER BY notified_of_cprs_entry_at, subject_number
+    </cfquery>
+
+    <cfreturn local.all_recs>
+  </cffunction>
+
+
+</cfcomponent>

@@ -1,0 +1,40 @@
+<cfset orders = view_data.orders>
+
+<cfoutput>
+<div class="row">
+  <div class="col-sm-12">
+    <h3>Prescriptions for Site #session.user.site_number#</h3>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-sm-12">
+    <div class="table-responsive">
+      <table id="orders_table" class="table table-striped  table-bordered">
+        <thead>
+          <th></th>
+          <th>Participant ID Number</th>
+          <th>ABQ Order Number</th>
+          <th>CMOP Received Date</th>
+          <th>ABQ Shipped Date</th>
+          <th>ABQ Cancellation Date (If Canceled)</th>
+          <th>Current Status</th>
+        </thead>
+        <tbody>
+          <cfloop query="orders">
+            <tr id="order_#id#">
+              <td><a class="btn btn-primary" href="#application.url_root#/main.cfm/orders/#id#/">View Details</a></td>
+              <td>#HTMLEditFormat(subject_number)#</td>
+              <td>#HTMLEditFormat(id)#</td>
+              <td>#HTMLEditFormat(DateFormat(receivedDateTime,'mm/dd/yyyy'))#</td>
+              <td>#HTMLEditFormat(DateFormat(shipped_at,'mm/dd/yyyy'))#</td>
+              <td>#HTMLEditFormat(DateFormat(cancelled_at,'mm/dd/yyyy'))#</td>
+              <td>#HTMLEditFormat(current_status)#</td>
+            </tr>
+          </cfloop>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</cfoutput>

@@ -1,0 +1,39 @@
+<cfoutput>  
+<div class="modal-dialog">
+  <div class="modal-content">
+    <div class="modal-header">        
+      <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true" >&times;</span><span class="sr-only">Close</span></button>
+      <h4 class="modal-title">FIT Result Details for Subject #view_data.subject_number#</h4>
+    </div>
+    
+    <div class="modal-body" id="cprs_form_modal_body">
+      <dl>
+        <div class="rec_detail">
+          <dt>Name:&nbsp;</dt>
+          <dd>#view_data.first_name#&nbsp;#view_data.last_name#</dd>
+        </div>
+        <div class="rec_detail">
+          <dt>SSN:&nbsp;</dt>
+          <dd>#view_data.ssn#</dd>
+        </div>
+        <div class="rec_detail">
+          <dt>Test Date:&nbsp;</dt>
+          <dd>#view_data.tested_on#</dd>
+        </div>
+        <div class="rec_detail">
+          <dt>Result 1 of 1 (Qualitative):&nbsp;</dt>
+          <dd>#view_data.is_positive#</dd>
+        </div>
+        <div class="rec_detail">
+          <h4>Put Checkbox here</h4>
+        </div>
+      </dl>
+    </div>    
+    
+    <div class="modal-footer">    
+      <button type="button" class="btn btn-primary pull-left" id="update_button" data-dismiss="modal">Done</button>    
+      <button type="button" class="btn btn-danger pull-right" id="cancel_button" data-dismiss="modal">Close</button>    
+    </div>       
+  </div>
+</div>
+</cfoutput>

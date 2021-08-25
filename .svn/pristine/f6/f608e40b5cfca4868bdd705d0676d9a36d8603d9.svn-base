@@ -1,0 +1,26 @@
+<cfcomponent extends="iwrs_controller">
+
+  <cffunction name="is_authorized" access="Public">
+    <cfreturn model("role").init(session.user.role_id).is_site_team() OR session.user.is_crpcc>
+  </cffunction>
+
+  
+  <!--- Check to see if the check_code subject_number combination is found in the iwrs_check_codes table . --->
+  <cffunction name="confirm_eligibility" access="Public">
+    <cfset local.view_data.confirmation_message = "" />
+    <cftry>
+      <cfset local.is_eligibility_confirmed = createObject("models.check_code").confirm_eligibility(subject_number = this.params.subject_number, check_code = this.params.check_code)>
+      
+      <cfif not is_eligibility_confirmed>
+        <cfthrow message="We could not confirm eligibility using the provided check code and subject number, please verify that you entered the correct check code and subject number.">
+      </cfif>   
+      <cfset local.view_data.confirmation_message = "<div class='alert alert-success'>Eligibility confirmed.</div>" />
+    <cfcatch>
+      <cfset local.view_data.confirmation_message = "<div class='alert alert-danger'>ERROR: #cfcatch.message#</div>" />	
+    </cfcatch>
+    </cftry>
+
+    <cfreturn render_json(view_data=local.view_data)>
+  </cffunction>
+
+</cfcomponent>

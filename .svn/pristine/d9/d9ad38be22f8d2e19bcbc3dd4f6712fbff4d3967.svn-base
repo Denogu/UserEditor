@@ -1,0 +1,34 @@
+<div class="row">
+  <div class="col-sm-12">
+    <h3>Randomized Participants</h3>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-sm-12">
+    <div class="table-responsive">
+      <table id="participants_table" class="table table-striped  table-bordered">
+        <thead>
+          <th></th>
+          <th>Participant ID Number</th>
+          <th>Check Code</th>
+          <th>Randomized At (UTC)</th>
+          <th>Randomized By</th>
+        </thead>
+        <tbody>
+          <cfloop query="view_data.participants">
+            <cfoutput>
+              <tr id="participant_#id#">
+                <td><a class="btn btn-primary" href="./#id#/">View Participant Details</td>
+                <td class="participant_subject_name">#HTMLEditFormat(subject_number)#</td>
+                <td class="participant_check_code">#HTMLEditFormat(check_code)#</td>
+                <td class="participant_randomized_at">#DateFormat(randomized_at_utc,'mm/dd/yyyy')# #TimeFormat(randomized_at_utc, 'short')#</td>
+                <td class="participant_user_name">#HTMLEditFormat(user_name)#</td>
+              </tr>
+            </cfoutput>
+          </cfloop>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

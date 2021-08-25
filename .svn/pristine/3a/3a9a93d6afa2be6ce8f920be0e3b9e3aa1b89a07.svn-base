@@ -1,0 +1,42 @@
+<cfquery name="local.recs" datasource="#application.dsn#">  
+  SELECT 
+    [subject_number], 
+    [check_code],
+    [randomization_site_number],
+    [randomized_at],
+    [randomized_by] 
+  FROM [pii].[iwrs_participants] 
+  WHERE is_available = 0 
+  AND randomization_site_number = <cfqueryparam value="#session.user.site_number#">
+  ORDER BY [randomized_at] DESC
+</cfquery>
+
+<h2 style="color: #6a8dac;">Randomization Report</h2>
+<div class="table-responsive">
+  <table id="randomization_report" class="table table-bordered" report_name="Randomization Report">
+    <thead>
+      <tr> 
+        <th>Participant ID Number</th>
+        <th>Check Code</th> 
+        <th>Randomization Date</th> 
+        <th>Randomized By</th>        
+      </tr>
+      <tr id="filterrow">
+        <th>Participant ID Number</th>
+        <th>Check Code</th> 
+        <th>Randomization Date</th>  
+        <th>Randomized By</th>      
+      </tr>
+    </thead>
+    <tbody>
+      <cfoutput query="local.recs">       
+        <tr>          
+          <td>#HTMLEditFormat(subject_number)#</td>
+          <td>#HTMLEditFormat(check_code)#</td>            
+          <td>#DateFormat(randomized_at,'medium')# #TimeFormat(randomized_at,'short')#</td>
+          <td>#HTMLEditFormat(randomized_by)#</td>
+        </tr>
+      </cfoutput>
+    </tbody>
+  </table>
+</div> 

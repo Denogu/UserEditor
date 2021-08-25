@@ -1,0 +1,41 @@
+<cfcomponent extends="iwrs_controller">
+
+<!--- handle unblinded record display here and in assignment display too? --->
+  <cffunction name="is_authorized" access="Public">
+    <cfreturn session.user.can_unblind> 
+  </cffunction>
+
+
+  <cffunction name="index" access="Public">
+    <cfset local.view_data.records = createObject("models.emergency_unblinding").all()>
+    <cfreturn render(local.view_data)>
+  </cffunction>
+
+
+  <cffunction name="new" access="Public">
+    <cfreturn render()>
+  </cffunction>
+
+
+  <cffunction name="unblinding_certificate" access="Public">
+    <cfset local.view_data.unblinding_record = createObject("models.emergency_unblinding").init(this.params.id)>
+    <cfset local.view_data.participant = local.view_data.unblinding_record.participant()>
+    <cfreturn render(local.view_data)>
+  </cffunction>
+
+
+  <cffunction name="create" access="Public">
+    <cftry>
+      <cfset local.participant = createObject("models.participant").init_by_ssn(this.params.ssn)>
+      <cfset local.view_data.participant = local.participant>
+      <cfset local.view_data.unblinding_record = createObject("models.emergency_unblinding").unblind_participant(local.participant, this.params.reason)>
+      <cfset local.view_data.is_success = true>
+    <cfcatch>
+      <cfset local.view_data.is_success = false>
+      <cfset local.view_data.error = cfcatch.message>
+    </cfcatch>
+    </cftry>
+    <cfreturn render(local.view_data)>
+  </cffunction>
+
+</cfcomponent>

@@ -1,0 +1,98 @@
+/*********************************************************************** Page Styling **************************************************************/
+body { background-color: #afafaf; color: #444; font-family: Helvetica,Arial,sans-serif;}
+h2 { color: #16354d; display: block; font-size: 1.6em; margin: 15px 0px; text-align: left;}
+dt { font-size: 1.1em; color: #444; margin-bottom: 1.1em; }
+
+
+.object_details {
+  border: solid 1px #ccc; 
+  border-radius: 5px; 
+  background-color: #fff;
+  padding: 10px;
+}
+
+/********************************************************** participants/details *****************************************************/
+
+#participant_details_page {
+  background-color: #fff; 
+  border-bottom: solid thin #ddd; 
+  border-bottom-left-radius: 10px; 
+  border-bottom-right-radius: 10px; 
+  border-left: solid thin #ddd; 
+  border-right: solid thin #ddd; 
+  margin: 0px; 
+  padding: 10px;
+}
+
+
+/********************************************************** Footer Styling ***********************************************************/
+footer {
+  margin-top: 100px;
+  text-align: center;
+}
+
+footer a {
+  font-size: 1.1em;
+  font-weight: bold;
+}
+
+
+.custom-error {
+  border: solid 1px #a94442;
+}
+
+.custom-success {
+  border: solid 1px #3c763d;
+}
+
+/********************Bootstrap overides *********************************/
+
+/*.row {
+margin-left: 0px;
+margin-right: 0px;
+}*/
+
+/*@media all and (min-width:768px)*/
+.navbar-right {
+    margin-right: 0px;
+}
+
+
+.navbar-default .navbar-nav > li > a:focus, .navbar-default .navbar-nav > li > a:hover {
+    background-color: #dcdcdc ;
+}
+
+
+.navbar-default {    
+    border-bottom-color: #16354d;
+    border-bottom-width: 1em;
+}
+
+
+
+.dropdown-menu > li > a:focus, .dropdown-menu > li > a:hover {
+    background-color: #dcdcdc ;
+}
+
+.modal {
+  margin: 50px auto;
+  width: 60%;
+}
+
+
+/***************************DataTables *******************/
+#user_table_wrapper {
+ cursor: pointer;
+}
+
+#atm_table tr:hover td
+{
+    cursor: pointer;
+    background-color: white;
+}  
+
+/*******removes clear element from input ***************/
+.col_filter::-ms-clear  {
+  display: none;
+} 
+

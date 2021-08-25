@@ -1,0 +1,54 @@
+<cfset DAYS_FROM_SHIPMENT_NEXT_PRESCRIPTION_DUE = 90 />
+<cfset DAYS_SINCE_LAST_SHIPMENT_UB = 90 />
+
+<cfquery name="local.recs" datasource="#application.dsn#">  
+  SELECT 
+    ip.[subject_number], 
+    ip.[site_number], 
+    b.[shipped_at] AS [last_shipped_at], 
+    DATEADD("d", #DAYS_FROM_SHIPMENT_NEXT_PRESCRIPTION_DUE#, [shipped_at]) AS [prescription_due_date],
+    DATEDIFF("d", [shipped_at], GETDATE()) AS [days_since_last_shipment],
+    GETDATE() AS [current_date]    
+  FROM ( SELECT * FROM 
+    (
+    SELECT ROW_NUMBER() OVER (PARTITION BY [participant_id] ORDER by [shipped_at] DESC) AS [RowNumber], 
+    [participant_id], [shipped_at] 
+    FROM [pii].[orders] WHERE [shipped_at] IS NOT NULL ) AS a  
+    WHERE a.RowNumber = 1  
+  ) AS b 
+  INNER JOIN [pii].[iwrs_participants] ip
+  ON ip.[id] = b.[participant_id]
+  WHERE ip.[site_number] = <cfqueryparam value="#session.user.site_number#">
+  ORDER BY [last_shipped_at]
+</cfquery>
+
+
+<h2 style="color: #6a8dac;">Prescriptions Overdue Report</h2>
+<div class="table-responsive">
+  <table id="prescriptions_overdue_report" class="table table-bordered" report_name="Prescriptions Overdue Report">
+    <thead>
+      <tr> 
+        <th>Participant ID Number</th>
+        <th>Number of Days Since Last Shipment</th> 
+        <th>Prescription Due Date</th>        
+      </tr>
+      <tr id="filterrow">
+        <th>Participant ID Number</th>
+        <th>Number of Days Since Last Shipment</th> 
+        <th>Prescription Due Date</th>        
+      </tr>
+    </thead>
+    <tbody>
+      <cfoutput query="local.recs">
+        
+        <cfif days_since_last_shipment GT DAYS_SINCE_LAST_SHIPMENT_UB >                    
+          <tr>
+            <td>#HTMLEditFormat(subject_number)#</td>
+            <td>#HTMLEditFormat(days_since_last_shipment)#</td>            
+            <td>#DateFormat(prescription_due_date,'medium')#</td>
+          </tr>
+        </cfif>
+      </cfoutput>
+    </tbody>
+  </table>
+</div> 

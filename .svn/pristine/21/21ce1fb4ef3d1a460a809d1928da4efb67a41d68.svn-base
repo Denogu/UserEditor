@@ -1,0 +1,84 @@
+<cfoutput>
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-sm-6">
+      <dt>Subject Number:</dt>
+    </div>
+    <div class="col-sm-6">
+      <dd>#participant.subject_number#</dd>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-sm-6">
+      <dt>Check Code:</dt>
+    </div>
+    <div class="col-sm-6">
+      <dd>#participant.check_code#</dd>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-sm-6">
+      <dt>First Name:</dt>
+    </div>
+    <div class="col-sm-6">
+      <dd>#participant.first_name#</dd>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-sm-6">
+      <dt>Last Name:</dt>
+    </div>
+    <div class="col-sm-6">
+      <dd>#participant.last_name#</dd>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-sm-6">
+      <dt>Middle Name:</dt>
+    </div>
+    <div class="col-sm-6">
+      <dd>#participant.middle_name#</dd>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-sm-6">
+      <dt>SSN:</dt>
+    </div>
+    <div class="col-sm-6">
+      <dd>#participant.ssn#</dd>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-sm-6">
+      <dt>Date of Birth:</dt>
+    </div>
+    <div class="col-sm-6">
+      <dd>#date_of_birth#</dd>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-sm-6">
+      <dt>Randomization Date:</dt>
+    </div>
+    <div class="col-sm-6">
+      <dd>#DateFormat(participant.randomized_at, 'mm/dd/yyyy')#</dd>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-sm-6">
+      <dt>Randomized By:</dt>
+    </div>
+    <div class="col-sm-6">
+      <dd>#participant.randomized_by#</dd>
+    </div>
+  </div>
+</div>
+</cfoutput>

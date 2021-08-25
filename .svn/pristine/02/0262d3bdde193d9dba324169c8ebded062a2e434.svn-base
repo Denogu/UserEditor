@@ -1,0 +1,113 @@
+<cfcomponent extends="iwrs_controller">
+
+  <cffunction name="is_authorized" access="Public">
+    <cfreturn session.user.can_manage_users>
+  </cffunction>
+
+
+
+  <cffunction name="records" access="Public">
+    <cfset local.view_data.users = createObject("component","models.user").all_readable() />
+    <cfreturn render(view_data=local.view_data)>
+  </cffunction>
+
+
+
+  <cffunction name="edit" access="Public">
+  <cfset local.view_data.sites = createObject("component", "models.site").all() />
+	  <cfset local.view_data.user = createObject("component", "models.user").init(this.params.id) />
+    <cfset local.view_data.user_site_access = session.user.user_site_access />
+    <cfset local.view_data.roles = createObject("component", "models.role").all_readable()>
+    <cfreturn render_partial(view_data=local.view_data) />
+  </cffunction>
+
+
+  <cffunction name="update" access="Public">
+    <cfset local.result = {is_success= true, message=""} />
+    <cfset local.user_form = StructNew() />
+    <cfset local.user_form['is_authorized'] = 0 />   
+    <!--- This will be undefined if the user unchecks the is_authorized checkbox. --->
+    
+
+    <!--- Section for updating user_site_access      --->
+    <cfset current_sites = valueArray(session.user.user_site_access, "site_id")>
+    <cfset new_sites = listToArray(this.params.SITE_ACCESS)>
+    <cfset delete_sites = []>
+    <cfset add_sites = []>
+
+    <cfif arrayToList(current_sites) IS arrayToList(new_sites)>
+      <cfoutput>
+        <p>Nothin new</p>
+      </cfoutput>
+    
+    <cfelse>
+      <cfoutput>
+        <cfloop array="#new_sites#" item="id" index="idx">
+<!--- Some script to compare the two arrays and return what needs to be deleted and what needs to be added.            --->
+          <cfscript>
+            if (arrayFind(current_sites, #id#) == 0)
+            {
+              arrayAppend(add_sites, #id#);
+            }
+          </cfscript>
+        </cfloop>
+
+        <cfloop array="#current_sites#" item="id" index="idx">
+          <cfscript>
+            if (arrayFind(new_sites, #id#) == 0)
+            {
+              arrayAppend(delete_sites, #id#);
+            }
+          </cfscript>
+        </cfloop>
+      </cfoutput>
+    </cfif>
+
+    <cfif arrayIsEmpty(add_sites)>
+      Add is empty
+    <cfelse>
+      Add is not empty
+    </cfif>
+
+    <cfif arrayIsEmpty(delete_sites)>
+      Delete is empty
+    <cfelse>
+      <cftry>
+        <cfset local.user_sites_to_edit = createObject("component", "models.user_site_access")>
+        <cfloop array="#delete_sites#" item="item" index="index">
+          <cfset local.site_result = local.user_sites_to_edit.delete_user_site(delete_sites[index], session.user.id)>
+        </cfloop>
+        <cfcatch>
+          <cfoutput>
+          #cfcatch.detail#
+          </cfoutput>
+        </cfcatch>
+      </cftry>
+    </cfif>
+
+
+<!---     Old sites to be deleted:
+    <cfdump var="#delete_sites#">
+    New sites to be added:
+    <cfdump var="#add_sites#"> --->
+
+    <cfloop collection="#this.params#" item="key">
+      <cfif ArrayContains(['first_name', 'last_name', 'email', 'role_id', 'site_number', 'is_authorized'], lcase(key))>
+        <cfset local.user_form[lcase(key)] = this.params[key] />
+      </cfif> 
+    </cfloop>
+
+    <cftry>
+      <cfset local.user = createObject("component", "models.user").init_from_user_name(this.params['user_name']) />
+      <cfset local.result = local.user.update_user_details(local.user_form) />
+    <cfcatch type="custom">
+      <cfset local.result.message = cfcatch.Message />
+      <cfset local.result.is_success = false />
+    </cfcatch>
+    </cftry>    
+    <cfreturn render_json(local.result) />
+     
+  </cffunction>
+<!------>
+
+</cfcomponent>

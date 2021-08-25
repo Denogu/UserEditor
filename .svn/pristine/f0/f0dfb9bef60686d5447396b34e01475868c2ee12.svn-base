@@ -1,0 +1,7 @@
+<cfoutput>
+<cfif local.view_data.success EQ 1>
+  <div class="alert alert-success">#local.view_data.message#</div>
+<cfelse>
+  <div class="alert alert-danger">#local.view_data.message#</div>
+</cfif>
+</cfoutput>

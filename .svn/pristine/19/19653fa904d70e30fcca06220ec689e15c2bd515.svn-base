@@ -1,0 +1,26 @@
+	<!--- Modal --->
+<div class="modal custom fade" id="randomizationConfirmationModal" role="dialog">
+	<div class="modal-dialog">
+	<!--- Modal content--->
+	<div class="modal-content">
+    	<div class="modal-header">        
+        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+        <h4 class="modal-title" id="confirmation_modal_title">Confirm</h4>
+        </div>
+        
+        <div class="modal-body bg-warning" id="confirmation_modal_body">
+        	<p>Confirm Participant ID Number and Check Code before proceeding.</p>
+                <b> Participant ID Number:&nbsp;<span id="subject_number_confirmation"></span> </b> <br/>
+                <b> Check Code:&nbsp;<span id="check_code_confirmation"></span> </b> 
+             <br><br>   
+            <p class="text-danger">Do not proceed unless the Participant ID Number and Check Code are correct.  If you proceed you will not be able to make further changes.</p>
+        </div>    
+        
+        <div class="modal-footer">
+            <button type="button" class="btn btn-primary pull-left" id="proceed_button">Proceed</button>
+        	<button type="button" class="btn btn-danger pull-right" id="cancel_button" data-dismiss="modal">Cancel and edit form</button>
+        </div>
+       
+    </div>
+    </div>
+</div>

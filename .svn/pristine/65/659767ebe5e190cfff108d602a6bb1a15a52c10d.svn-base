@@ -1,0 +1,26 @@
+//$(document).ready is where you add event handlers to elements.
+$(document).ready(function() {
+	
+  var fit_results_table = $('#fit_results_table').DataTable({	
+						lengthMenu: [[10, 25, 50, -1],[10, 25, 50, "All"]] ,  
+						pageLength: 25										  					  
+					});			
+
+  $('#fit_results_table').on('click', 'a.cprsEntryBtn', function() {
+    var target = $(this).attr('href');
+    $('div#cprs_modal').load(target, function() {
+      $(this).modal('toggle');
+    });
+    return false;
+  });
+
+
+  $('#cprs_modal').on('submit', 'form.update_fit_result_form', function() {
+    var target = $(this).attr('action');
+    var form_data = $(this).serialize();
+    $.post(target, form_data, function( response ) {
+      $('div#cprs_form_modal_body').html( response );
+    });
+    return false;
+  });
+});

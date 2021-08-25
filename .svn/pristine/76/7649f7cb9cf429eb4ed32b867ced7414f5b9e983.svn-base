@@ -1,0 +1,47 @@
+
+<cfquery name="local.recs" datasource="#application.dsn#">  
+  SELECT ip.[subject_number], ip.[site_number], 
+  o.[id] AS [order_id], o.[OrderNumber], o.[shipped_at], o.[return_to_sender_at], od.[RxNumber]
+  FROM 
+  [pii].[orders] o INNER JOIN [pii].[order_details]  od
+  ON o.[id] = od.[order_id]  
+  INNER JOIN [pii].[iwrs_participants] ip
+  ON o.[participant_id] = ip.[id]
+  WHERE o.[is_return_to_sender] = 1
+  AND ip.[site_number] = <cfqueryparam value="#session.user.site_number#"> 
+  ORDER BY o.[return_to_sender_at] DESC    
+</cfquery>
+
+
+<h2 style="color: #6a8dac;">Return to Sender Report</h2>
+<div class="table-responsive">
+  <table id="return_to_sender_report" class="table table-bordered" report_name="Return to Sender Report">
+    <thead>
+      <tr>
+        <th>Participant ID Number</th>
+        <th>Order Number</th> 
+        <th>Rx Number</th>
+        <th>Ship Date</th> 
+        <th>Date Returned to Sender</th>        
+      </tr>
+      <tr id="filterrow">        
+        <th>Participant ID Number</th>
+        <th>Order Number</th>
+        <th>Rx Number</th> 
+        <th>Ship Date</th> 
+        <th>Date Returned to Sender</th>        
+      </tr>
+    </thead>
+    <tbody>
+      <cfoutput query="local.recs">                            
+        <tr>
+          <td>#HTMLEditFormat(subject_number)#</td>
+          <td>#HTMLEditFormat(order_id)#</td>
+          <td>#HTMLEditFormat(RxNumber)#</td>             
+          <td>#DateFormat(shipped_at,'medium')#</td>
+          <td>#DateFormat(return_to_sender_at,'medium')#</td>
+        </tr>        
+      </cfoutput>
+    </tbody>
+  </table>
+</div> 

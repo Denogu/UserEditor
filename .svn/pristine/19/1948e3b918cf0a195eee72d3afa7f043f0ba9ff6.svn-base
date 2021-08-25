@@ -1,0 +1,21 @@
+<cfset participant = view_data.participant>
+<cfoutput>
+<ul class="nav nav-tabs">
+  <li class="active"><a data-toggle="tab" href="##participant_details">Participant Details</a></li>
+  <li><a data-toggle="tab" href="##orders">Prescription History</a></li>
+  <li><a data-toggle="tab" href="##medication">Medication History</a></li>
+</ul>
+
+<div class="tab-content" id="participant_details_page">
+  <div id="participant_details" class="tab-pane fade in active">
+    <cfinclude template="./_details.cfm">
+  </div>
+
+  <div id="orders" class="tab-pane fade">
+    <cfinclude template="./_order_history.cfm">
+  </div>
+  <div id="medication" class="tab-pane fade">
+    <cfinclude template="./_medication_history.cfm">
+  </div>
+</div>
+</cfoutput>

@@ -1,0 +1,54 @@
+
+<cfquery name="local.recs" datasource="#application.dsn#">
+  SELECT * FROM 
+  (
+    SELECT i.*, DateDiff("D", scanned_at, GETDATE()) AS days_since_scanned, od.order_id, od.rxNumber, 
+    ip.site_number, ip.subject_number, ip.check_code 
+    FROM items i
+    INNER JOIN pii.order_details od
+    ON i.order_detail_id = od.id
+    INNER JOIN pii.iwrs_participants ip
+    ON ip.id = i.participant_id  
+    WHERE ip.site_number = <cfqueryparam value="#session.user.site_number#">
+    AND i.returned_at IS NULL
+  ) a
+  WHERE a.days_since_scanned > #application.return_by_number_of_days#
+  ORDER BY subject_number, id  
+</cfquery>
+
+
+<h2 style="color: #6a8dac;">Delinquent Bottle Report</h2>
+<div class="table-responsive">
+  <table id="delinquent_bottle_report" class="table table-bordered" report_name="Delinquent Bottle Report">
+    <thead>
+      <tr> 
+        <th>Participant ID Number</th>
+        <th>Check Code</th> 
+        <th>CMOP Rx Number</th>      
+        <th>Bottle Number</th>        
+        <th>Scanned for Shipping Date</th>
+        <th>Number of Days Since Shipped</th>        
+      </tr>
+      <tr id="filterrow">
+        <th>Participant ID Number</th>
+        <th>Check Code</th>
+        <th>CMOP Rx Number</th>
+        <th>Bottle Number</th>        
+        <th>Scanned for Shipping Date</th>
+        <th>Number of Days Since Shipped</th>        
+      </tr>
+    </thead>
+    <tbody>
+      <cfoutput query="local.recs">
+        <tr>
+            <td>#HTMLEditFormat(subject_number)#</td>
+            <td>#HTMLEditFormat(check_code)#</td>            
+            <td>#HTMLEditFormat(rxNumber)#</td>
+            <td>#HTMLEditFormat(number)#</td>
+            <td>#DateFormat(scanned_at,'medium')#</td>
+            <td>#HTMLEditFormat(days_since_scanned)#</td>            
+        </tr>      
+      </cfoutput>
+    </tbody>
+  </table>
+</div> 

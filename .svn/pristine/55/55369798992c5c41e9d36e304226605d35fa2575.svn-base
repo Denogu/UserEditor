@@ -1,0 +1,41 @@
+//$(document).ready is where you add event handlers to elements.
+$(document).ready(function() {
+	
+  $('#participant_medication_history_table').DataTable({	
+    "order": [[0, 'desc']],
+	  "lengthMenu": [[10, 25, 50, -1],[10, 25, 50, "All"]] ,  
+		"pageLength": 25
+	});			
+
+  $('#participant_prescription_history_table').DataTable({	
+    "columnDefs": [ 
+      {
+        "targets": [0],
+        "searchable": false
+      }
+    ],
+    "order": [[1, 'desc']],
+	  "lengthMenu": [[10, 25, 50, -1],[10, 25, 50, "All"]] ,  
+		"pageLength": 25
+	});		
+
+  //Change Participant Status
+  $('#change_participant_status_link').on('click', function() {
+    var href = $(this).attr('href');
+    $('#modal_change_participant_status').load(href);
+  });
+
+  $('#modal_change_participant_status').on('submit', 'form#change_participant_status_form', function(e) {
+    e.preventDefault();
+    var serialized_form = $(this).serialize();
+    var target = $(this).attr('action');
+    $('div#modal_change_participant_status_form_body').load(target, serialized_form, function() {
+    });
+    return false;
+  });
+
+  $('#modal_change_participant_status').on('hidden.bs.modal', function () {
+   location.reload();
+  })
+
+});
